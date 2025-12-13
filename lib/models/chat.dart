@@ -9,6 +9,7 @@ class Chat {
   final DateTime? lastMessageTime;
   final int unreadCount;
   final DateTime createdAt;
+  final bool? isPinned;
 
   Chat({
     required this.id,
@@ -21,6 +22,7 @@ class Chat {
     this.lastMessageTime,
     this.unreadCount = 0,
     required this.createdAt,
+    this.isPinned,
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) {
@@ -40,6 +42,7 @@ class Chat {
           : null,
       unreadCount: json['unread_count'] as int? ?? 0,
       createdAt: DateTime.parse(json['created_at'] as String),
+      isPinned: json['is_pinned'] as bool? ?? false,
     );
   }
 
@@ -55,6 +58,7 @@ class Chat {
       'last_message_time': lastMessageTime?.toIso8601String(),
       'unread_count': unreadCount,
       'created_at': createdAt.toIso8601String(),
+      'is_pinned': isPinned,
     };
   }
 }

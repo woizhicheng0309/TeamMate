@@ -71,11 +71,73 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }
 
+          // 分离置顶和未置顶的聊天
+          final pinnedChats = chats.where((c) => c.isPinned ?? false).toList();
+          final unpinnedChats = chats.where((c) => !(c.isPinned ?? false)).toList();
+          
+          // 合并：置顶在前
+          final sortedChats = [...pinnedChats, ...unpinnedChats];
+
           return ListView.builder(
-            itemCount: chats.length,
+            itemCount: sortedChats.length,
             itemBuilder: (context, index) {
-              final chat = chats[index];
-              return _buildChatItem(chat, userId);
+              final chat = sortedChats[index];
+              return Dismissible(
+                key: Key(chat.id),
+                direction: DismissDirection.startToEnd,
+                background: Container(
+                  color: Colors.orange,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        chat.isPinned ?? false ? Icons.push_pin_outlined : Icons.push_pin,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        chat.isPinned ?? false ? '取消置頂' : '置頂',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                secondaryBackground: Container(
+                  color: Colors.red,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 16),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Icon(Icons.delete, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        '刪除',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                onDismissed: (direction) {
+                  if (direction == DismissDirection.startToEnd) {
+                    // 置頂/取消置頂
+                    _togglePinChat(chat);
+                  } else {
+                    // 刪除
+                    _deleteChat(chat);
+                  }
+                },
+                child: _buildChatItem(chat, userId),
+              );
             },
           );
         },
@@ -194,5 +256,28 @@ class _ChatListScreenState extends State<ChatListScreen> {
     } else {
       return '${time.month}/${time.day}';
     }
+  }
+
+  void _togglePinChat(Chat chat) {
+    final newPinnedState = !(chat.isPinned ?? false);
+    _chatService.updateChatPinned(chat.id, newPinnedState);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(newPinnedState ? '聊天已置頂' : '聊天已取消置頂'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _deleteChat(Chat chat) {
+    _chatService.deleteChat(chat.id);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('聊天已刪除'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 }
