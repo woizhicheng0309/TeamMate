@@ -6,13 +6,10 @@ import '../services/auth_service.dart';
 class ParticipantCheckInScreen extends StatefulWidget {
   final Activity activity;
 
-  const ParticipantCheckInScreen({
-    super.key,
-    required this.activity,
-  });
+  const ParticipantCheckInScreen({super.key, required this.activity});
 
   @override
-  State<ParticipantCheckInScreenState> createState() =>
+  State<ParticipantCheckInScreen> createState() =>
       _ParticipantCheckInScreenState();
 }
 
@@ -82,8 +79,7 @@ class _ParticipantCheckInScreenState extends State<ParticipantCheckInScreen> {
         }
       } else {
         setState(() {
-          _errorMessage =
-              '❌ 密碼錯誤或創建者還未打卡。請檢查密碼並重試。';
+          _errorMessage = '❌ 密碼錯誤或創建者還未打卡。請檢查密碼並重試。';
         });
       }
     } catch (e) {
@@ -106,10 +102,7 @@ class _ParticipantCheckInScreenState extends State<ParticipantCheckInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('參與者打卡'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('參與者打卡'), elevation: 0),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -158,10 +151,7 @@ class _ParticipantCheckInScreenState extends State<ParticipantCheckInScreen> {
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.green,
-                          width: 2,
-                        ),
+                        border: Border.all(color: Colors.green, width: 2),
                       ),
                       child: Column(
                         children: [
@@ -182,10 +172,7 @@ class _ParticipantCheckInScreenState extends State<ParticipantCheckInScreen> {
                           const SizedBox(height: 8),
                           const Text(
                             '您已成功確認到場',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -226,10 +213,7 @@ class _ParticipantCheckInScreenState extends State<ParticipantCheckInScreen> {
                           SizedBox(height: 8),
                           Text(
                             '1. 請向創建者索取4位密碼\n2. 確保您在活動地點附近\n3. 輸入密碼並按確認',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -293,9 +277,7 @@ class _ParticipantCheckInScreenState extends State<ParticipantCheckInScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('確認打卡'),
                     ),

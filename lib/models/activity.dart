@@ -11,7 +11,8 @@ class Activity {
   final String? address;
   final int maxParticipants;
   final int currentParticipants;
-  final String status; // 'open', 'full', 'completed', 'cancelled', 'ended', 'failed'
+  final String
+  status; // 'open', 'full', 'completed', 'cancelled', 'ended', 'failed'
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? checkInStartTime;
@@ -97,7 +98,10 @@ class Activity {
   bool get isOpen => status == 'open' && !isFull;
   bool get isPast => eventDate.isBefore(DateTime.now());
   bool get isEnded =>
-      status == 'ended' || status == 'completed' || status == 'cancelled' || status == 'failed';
+      status == 'ended' ||
+      status == 'completed' ||
+      status == 'cancelled' ||
+      status == 'failed';
 
   Activity copyWith({
     String? id,

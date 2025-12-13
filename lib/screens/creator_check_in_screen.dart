@@ -7,10 +7,7 @@ import 'dart:async';
 class CreatorCheckInScreen extends StatefulWidget {
   final Activity activity;
 
-  const CreatorCheckInScreen({
-    super.key,
-    required this.activity,
-  });
+  const CreatorCheckInScreen({super.key, required this.activity});
 
   @override
   State<CreatorCheckInScreen> createState() => _CreatorCheckInScreenState();
@@ -61,9 +58,8 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
           content: const Text('創建者在打卡窗口（開始前5分鐘至開始後5分鐘）內未完成打卡，活動已被標記為失敗。'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).popUntil(
-                (route) => route.isFirst,
-              ),
+              onPressed: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
               child: const Text('返回'),
             ),
           ],
@@ -133,10 +129,7 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('創建者打卡'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('創建者打卡'), elevation: 0),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -188,8 +181,8 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                     Text(
                       '剩餘時間',
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
+                        color: Colors.grey[600],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Container(
@@ -258,10 +251,7 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.green,
-                          width: 2,
-                        ),
+                        border: Border.all(color: Colors.green, width: 2),
                       ),
                       child: Column(
                         children: [
@@ -282,10 +272,7 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                           const SizedBox(height: 24),
                           const Text(
                             '參與者密碼',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                           const SizedBox(height: 8),
                           Container(
@@ -308,10 +295,7 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                           const Text(
                             '請將此密碼告知參與者以進行打卡確認',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -338,9 +322,7 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Text('開始打卡'),
                 ),

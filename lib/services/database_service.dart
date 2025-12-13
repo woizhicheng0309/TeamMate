@@ -133,7 +133,7 @@ class DatabaseService {
       // 更新活動的當前參加人數
       final activity = await _supabase
           .from('activities')
-          .select('current_participants')
+          .select('current_participants, title')
           .eq('id', activityId)
           .single();
 
@@ -143,9 +143,70 @@ class DatabaseService {
             'current_participants': (activity['current_participants'] ?? 0) + 1,
           })
           .eq('id', activityId);
+
+      // 自動加入群組聊天
+      await _joinActivityGroupChat(activityId, userId, activity['title'] ?? '活動');
     } catch (e) {
       print('Error joining activity: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _joinActivityGroupChat(
+    String activityId,
+    String userId,
+    String activityTitle,
+  ) async {
+    try {
+      // 獲取所有參與者 ID
+      final participantsData = await _supabase
+          .from('participants')
+          .select('user_id')
+          .eq('activity_id', activityId);
+
+      final participantIds = <String>{};
+      for (final p in participantsData as List) {
+        participantIds.add(p['user_id'] as String);
+      }
+
+      // 檢查是否已有群組聊天
+      final existingChat = await _supabase
+          .from('chats')
+          .select('id, participants')
+          .eq('activity_id', activityId)
+          .eq('type', 'group')
+          .maybeSingle();
+
+      if (existingChat != null) {
+        // 更新參與者列表
+        final currentParticipants = Set<String>.from(
+          (existingChat['participants'] as List<dynamic>)
+              .map((e) => e.toString()),
+        );
+        currentParticipants.addAll(participantIds);
+
+        await _supabase
+            .from('chats')
+            .update({
+              'participants': currentParticipants.toList(),
+            })
+            .eq('id', existingChat['id']);
+      } else {
+        // 創建新群組聊天
+        await _supabase.from('chats').insert({
+          'type': 'group',
+          'activity_id': activityId,
+          'name': activityTitle,
+          'participants': participantIds.toList(),
+          'last_message': null,
+          'last_message_time': DateTime.now().toIso8601String(),
+        });
+      }
+
+      print('✅ 成功加入群組聊天: $activityTitle');
+    } catch (e) {
+      print('⚠️ 加入群組聊天失敗: $e');
+      // 不拋出異常，以免影響加入活動的主流程
     }
   }
 
