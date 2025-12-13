@@ -24,6 +24,9 @@ class JoinRequest {
   });
 
   factory JoinRequest.fromJson(Map<String, dynamic> json) {
+    // 解析嵌套的 user 对象
+    final userObj = json['user'] as Map<String, dynamic>?;
+    
     return JoinRequest(
       id: json['id'] as String,
       activityId: json['activity_id'] as String,
@@ -31,9 +34,9 @@ class JoinRequest {
       status: json['status'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      userEmail: json['user_email'] as String?,
-      userFullName: json['user_full_name'] as String?,
-      userAvatarUrl: json['user_avatar_url'] as String?,
+      userEmail: userObj?['email'] as String?,
+      userFullName: userObj?['full_name'] as String?,
+      userAvatarUrl: userObj?['avatar_url'] as String?,
     );
   }
 

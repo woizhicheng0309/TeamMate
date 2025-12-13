@@ -158,6 +158,13 @@ class DatabaseService {
           .eq('activity_id', activityId)
           .eq('user_id', userId);
 
+      // 刪除相關的加入申請記錄，這樣用戶可以重新申請
+      await _supabase
+          .from('join_requests')
+          .delete()
+          .eq('activity_id', activityId)
+          .eq('user_id', userId);
+
       // 更新活動的當前參加人數
       final activity = await _supabase
           .from('activities')
@@ -472,10 +479,18 @@ class DatabaseService {
         });
 
         // 更新活動參與人數
-        await _supabase.rpc(
-          'increment_participant_count',
-          params: {'activity_id': activityId},
-        );
+        final activity = await _supabase
+            .from('activities')
+            .select('current_participants')
+            .eq('id', activityId)
+            .single();
+
+        await _supabase
+            .from('activities')
+            .update({
+              'current_participants': (activity['current_participants'] ?? 0) + 1,
+            })
+            .eq('id', activityId);
 
         // 獲取群組聊天並添加用戶
         final groupChat = await _supabase
