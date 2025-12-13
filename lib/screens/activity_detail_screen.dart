@@ -44,7 +44,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     
     // 添加定时器在打卡窗口期间每秒刷新 UI
     _checkInWindowTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final now = DateTime.now();
+      final now = DateTime.now().toUtc();  // 轉換為 UTC 時間
       final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
       final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
       
@@ -396,13 +396,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         widget.activity.currentParticipants >= widget.activity.maxParticipants;
 
     // 調試打卡窗口
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();  // 轉換為 UTC 時間
     final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
     final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
     final inCheckInWindow = now.isAfter(checkInStart) && now.isBefore(checkInEnd);
     
     print('🔍 打卡調試:');
-    print('  當前時間: $now');
+    print('  當前時間 (UTC): $now');
     print('  活動時間: ${widget.activity.eventDate}');
     print('  打卡窗口: $checkInStart ~ $checkInEnd');
     print('  在窗口內: $inCheckInWindow');
@@ -515,7 +515,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           const SizedBox(height: 16),
 
           // 打卡狀態顯示
-          if (activity.creatorCheckedIn ?? false)
+          if (widget.activity.creatorCheckedIn ?? false)
             Card(
               color: Colors.green.shade50,
               child: Padding(
@@ -553,7 +553,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     DateFormat(
                       'yyyy/MM/dd HH:mm',
                       'zh_TW',
-                    ).format(activity.eventDate),
+                    ).format(widget.activity.eventDate.add(const Duration(hours: 8))),  // UTC+8 台灣時區
                   ),
                   const Divider(),
                   _buildInfoRow(
@@ -748,13 +748,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
           // 打卡按鈕（創建者）
           if (isCreator &&
-              DateTime.now().isAfter(
-                activity.eventDate.subtract(const Duration(minutes: 5)),
+              DateTime.now().toUtc().isAfter(
+                widget.activity.eventDate.subtract(const Duration(minutes: 5)),
               ) &&
-              DateTime.now().isBefore(
-                activity.eventDate.add(const Duration(minutes: 5)),
+              DateTime.now().toUtc().isBefore(
+                widget.activity.eventDate.add(const Duration(minutes: 5)),
               ) &&
-              !(activity.creatorCheckedIn ?? false))
+              !(widget.activity.creatorCheckedIn ?? false))
             SizedBox(
               height: 50,
               child: ElevatedButton.icon(
@@ -763,7 +763,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          CreatorCheckInScreen(activity: activity),
+                          CreatorCheckInScreen(activity: widget.activity),
                     ),
                   );
                 },
@@ -779,12 +779,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           // 打卡確認按鈕（參與者）
           if (!isCreator &&
               _hasJoined &&
-              (activity.creatorCheckedIn ?? false) &&
-              DateTime.now().isAfter(
-                activity.eventDate.subtract(const Duration(minutes: 5)),
+              (widget.activity.creatorCheckedIn ?? false) &&
+              DateTime.now().toUtc().isAfter(
+                widget.activity.eventDate.subtract(const Duration(minutes: 5)),
               ) &&
-              DateTime.now().isBefore(
-                activity.eventDate.add(const Duration(minutes: 5)),
+              DateTime.now().toUtc().isBefore(
+                widget.activity.eventDate.add(const Duration(minutes: 5)),
               ))
             SizedBox(
               height: 50,
