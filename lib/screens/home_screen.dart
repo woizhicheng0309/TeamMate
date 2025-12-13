@@ -3,7 +3,7 @@ import 'nearby_activities_screen.dart';
 import 'create_activity_screen.dart';
 import 'my_activities_screen.dart';
 import 'profile_screen.dart';
-// import 'chat_list_screen.dart'; // TODO: Fix chat implementation
+import 'chat_list_screen.dart';
 import '../services/location_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const NearbyActivitiesScreen(),
     const CreateActivityScreen(),
     const MyActivitiesScreen(),
-    const Center(child: Text('聊天功能開發中')), // ChatListScreen placeholder
+    const ChatListScreen(),
     const ProfileScreen(),
   ];
 
