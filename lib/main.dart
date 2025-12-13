@@ -143,6 +143,7 @@ class AuthWrapper extends StatelessWidget {
     }
 
     final authService = AuthService();
+    final notificationService = NotificationService();
 
     return StreamBuilder<AuthState>(
       stream: authService.authStateChanges,
@@ -158,6 +159,15 @@ class AuthWrapper extends StatelessWidget {
         if (snapshot.data?.event == AuthChangeEvent.signedOut ||
             snapshot.data?.session == null) {
           return const LoginScreen();
+        }
+
+        // 如果用戶已認證，設置 OneSignal 用戶 ID
+        final userId = authService.userId;
+        if (userId != null) {
+          // 異步調用，不阻止 UI 構建
+          Future.delayed(Duration.zero, () {
+            notificationService.setUserId(userId);
+          });
         }
 
         // Show home screen if authenticated
