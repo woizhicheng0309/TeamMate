@@ -710,7 +710,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           ],
 
           // 打卡按鈕（創建者）
-          if (isCreator && widget.activity.eventDate.isBefore(DateTime.now().add(const Duration(hours: 1))))
+          if (isCreator &&
+              DateTime.now().isAfter(widget.activity.eventDate.subtract(const Duration(minutes: 5))) &&
+              DateTime.now().isBefore(widget.activity.eventDate.add(const Duration(minutes: 5))) &&
+              !(widget.activity.creatorCheckedIn ?? false))
             SizedBox(
               height: 50,
               child: ElevatedButton.icon(
@@ -734,7 +737,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ),
 
           // 打卡確認按鈕（參與者）
-          if (!isCreator && _hasJoined && widget.activity.eventDate.isBefore(DateTime.now().add(const Duration(hours: 1))))
+          if (!isCreator &&
+              _hasJoined &&
+              widget.activity.creatorCheckedIn == true &&
+              DateTime.now().isAfter(widget.activity.eventDate.subtract(const Duration(minutes: 5))) &&
+              DateTime.now().isBefore(widget.activity.eventDate.add(const Duration(minutes: 5))))
             SizedBox(
               height: 50,
               child: ElevatedButton.icon(

@@ -23,7 +23,7 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
   bool _isLoading = false;
   bool _checkedIn = false;
   String? _checkInCode;
-  int _timeRemaining = 300; // 5 minutes in seconds
+  int _timeRemaining = 600; // 10 minutes in seconds (5 before + 5 after)
   late Timer _timer;
   String? _errorMessage;
 
@@ -58,7 +58,7 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           title: const Text('⚠️ 活動失敗'),
-          content: const Text('由於創建者未在5分鐘內打卡，活動已被標記為失敗。'),
+          content: const Text('創建者在打卡窗口（開始前5分鐘至開始後5分鐘）內未完成打卡，活動已被標記為失敗。'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).popUntil(
@@ -181,8 +181,15 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                 Column(
                   children: [
                     Text(
-                      '剩餘時間',
+                      '打卡窗口：開始前5分鐘至開始後5分鐘',
                       style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '剩餘時間',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: Colors.grey[600],
+                          ),
                     ),
                     const SizedBox(height: 16),
                     Container(
