@@ -48,6 +48,10 @@ app.*.map.json
 *.pem
 team-ssh-key.pem
 .env
+
+# Database scripts - not needed in repo
+database_update.sql
+*.sql
 .env.local
 *.key
 *.keystore

@@ -254,12 +254,28 @@ class ChatService {
       // 給除了發送者之外的所有參與者發送通知
       for (final participantId in participants) {
         if (participantId != senderId) {
-          print('📤 向用戶 $participantId 發送通知...');
+          print('📤 檢查用戶 $participantId 的通知設定...');
 
           try {
+            // 檢查用戶的通知設定
+            final userSettings = await _supabase
+                .from('users')
+                .select('notification_chat')
+                .eq('id', participantId)
+                .maybeSingle();
+
+            final chatNotificationEnabled = userSettings?['notification_chat'] as bool? ?? true;
+
+            if (!chatNotificationEnabled) {
+              print('🔕 用戶 $participantId 已關閉聊天通知，跳過發送');
+              continue;
+            }
+
+            print('✅ 用戶 $participantId 已開啟聊天通知，準備發送...');
+
             // 調用 Supabase Edge Function 發送通知
             final response = await _supabase.functions.invoke(
-              'send-push-notification',
+              'bright-function',
               body: {
                 'userId': participantId,
                 'title': '新消息',

@@ -64,16 +64,8 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final updatedProfile = UserProfile(
-        id: _profile!.id,
-        email: _profile!.email,
-        displayName: _profile!.displayName,
-        photoUrl: _profile!.photoUrl,
-        phoneNumber: _profile!.phoneNumber,
+      final updatedProfile = _profile!.copyWith(
         interests: _selectedSports.toList(),
-        latitude: _profile!.latitude,
-        longitude: _profile!.longitude,
-        createdAt: _profile!.createdAt,
         updatedAt: DateTime.now(),
       );
 

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/notification_service.dart';
+import '../services/auth_service.dart';
+import '../services/database_service.dart';
+import '../models/user_profile.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -10,25 +13,78 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
   final _notificationService = NotificationService();
+  final _authService = AuthService();
+  final _databaseService = DatabaseService();
   
   bool _chatNotifications = true;
   bool _activityNotifications = true;
   bool _systemNotifications = true;
   bool _pushEnabled = false;
   bool _isLoading = true;
+  UserProfile? _profile;
 
   @override
   void initState() {
     super.initState();
-    _checkPermissions();
+    _loadSettings();
   }
 
-  Future<void> _checkPermissions() async {
-    final hasPermission = await _notificationService.hasPermission();
-    setState(() {
-      _pushEnabled = hasPermission;
-      _isLoading = false;
-    });
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final hasPermission = await _notificationService.hasPermission();
+      final userId = _authService.currentUser?.id;
+      
+      if (userId != null) {
+        final profile = await _databaseService.getUserProfile(userId);
+        setState(() {
+          _profile = profile;
+          _pushEnabled = hasPermission;
+          _chatNotifications = profile?.notificationChat ?? true;
+          _activityNotifications = profile?.notificationActivity ?? true;
+          _systemNotifications = profile?.notificationSystem ?? true;
+        });
+      } else {
+        setState(() {
+          _pushEnabled = hasPermission;
+        });
+      }
+    } catch (e) {
+      print('Error loading settings: $e');
+      setState(() {
+        _pushEnabled = false;
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+  
+  Future<void> _saveSettings() async {
+    if (_profile == null) return;
+    
+    try {
+      final updatedProfile = _profile!.copyWith(
+        notificationChat: _chatNotifications,
+        notificationActivity: _activityNotifications,
+        notificationSystem: _systemNotifications,
+        updatedAt: DateTime.now(),
+      );
+
+      await _databaseService.updateUserProfile(updatedProfile);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('通知設定已保存')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失敗: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _requestPermission() async {
@@ -112,8 +168,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             subtitle: const Text('有新消息時接收通知'),
             value: _chatNotifications,
             onChanged: _pushEnabled ? (value) {
-              setState(() => _chatNotifications = value);
-            } : null,
+              setState(() => _chatNotifications = value);              _saveSettings();            } : null,
             secondary: const Icon(Icons.chat),
           ),
           
@@ -123,8 +178,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             subtitle: const Text('活動更新和邀請通知'),
             value: _activityNotifications,
             onChanged: _pushEnabled ? (value) {
-              setState(() => _activityNotifications = value);
-            } : null,
+              setState(() => _activityNotifications = value);              _saveSettings();            } : null,
             secondary: const Icon(Icons.event),
           ),
           
@@ -134,8 +188,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             subtitle: const Text('系統消息和更新通知'),
             value: _systemNotifications,
             onChanged: _pushEnabled ? (value) {
-              setState(() => _systemNotifications = value);
-            } : null,
+              setState(() => _systemNotifications = value);              _saveSettings();            } : null,
             secondary: const Icon(Icons.info),
           ),
           

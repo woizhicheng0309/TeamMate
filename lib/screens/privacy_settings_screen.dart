@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/database_service.dart';
+import '../models/user_profile.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
   const PrivacySettingsScreen({super.key});
@@ -10,14 +12,78 @@ class PrivacySettingsScreen extends StatefulWidget {
 
 class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   final _authService = AuthService();
+  final _databaseService = DatabaseService();
   
   bool _showEmail = true;
   bool _showPhone = false;
   bool _showLocation = true;
   bool _allowFriendRequests = true;
+  bool _isLoading = true;
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final userId = _authService.currentUser?.id;
+      if (userId != null) {
+        final profile = await _databaseService.getUserProfile(userId);
+        setState(() {
+          _profile = profile;
+          _showEmail = profile?.privacyShowEmail ?? true;
+          _showPhone = profile?.privacyShowPhone ?? false;
+          _showLocation = profile?.privacyShowLocation ?? true;
+          _allowFriendRequests = profile?.privacyAllowFriendRequests ?? true;
+        });
+      }
+    } catch (e) {
+      print('Error loading privacy settings: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    if (_profile == null) return;
+    
+    try {
+      final updatedProfile = _profile!.copyWith(
+        privacyShowEmail: _showEmail,
+        privacyShowPhone: _showPhone,
+        privacyShowLocation: _showLocation,
+        privacyAllowFriendRequests: _allowFriendRequests,
+        updatedAt: DateTime.now(),
+      );
+
+      await _databaseService.updateUserProfile(updatedProfile);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('隱私設定已保存')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失敗: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('隱私設定'),
@@ -40,8 +106,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             subtitle: const Text('其他用戶可以看到你的電子郵件'),
             value: _showEmail,
             onChanged: (value) {
-              setState(() => _showEmail = value);
-            },
+              setState(() => _showEmail = value);              _saveSettings();            },
             secondary: const Icon(Icons.email),
           ),
           
@@ -50,8 +115,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             subtitle: const Text('其他用戶可以看到你的電話號碼'),
             value: _showPhone,
             onChanged: (value) {
-              setState(() => _showPhone = value);
-            },
+              setState(() => _showPhone = value);              _saveSettings();            },
             secondary: const Icon(Icons.phone),
           ),
           
@@ -60,8 +124,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             subtitle: const Text('在活動中顯示你的位置'),
             value: _showLocation,
             onChanged: (value) {
-              setState(() => _showLocation = value);
-            },
+              setState(() => _showLocation = value);              _saveSettings();            },
             secondary: const Icon(Icons.location_on),
           ),
           
@@ -84,6 +147,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             value: _allowFriendRequests,
             onChanged: (value) {
               setState(() => _allowFriendRequests = value);
+              _saveSettings();
             },
             secondary: const Icon(Icons.person_add),
           ),

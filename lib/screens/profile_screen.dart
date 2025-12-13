@@ -94,17 +94,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 50,
-                        backgroundImage: userMetadata?['avatar_url'] != null
-                            ? NetworkImage(userMetadata!['avatar_url'])
+                        backgroundImage: _userProfile?.photoUrl != null && _userProfile!.photoUrl!.isNotEmpty
+                            ? NetworkImage(_userProfile!.photoUrl!)
                             : null,
-                        child: userMetadata?['avatar_url'] == null
+                        child: _userProfile?.photoUrl == null || _userProfile!.photoUrl!.isEmpty
                             ? const Icon(Icons.person, size: 50)
                             : null,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        userMetadata?['full_name'] ??
-                            userMetadata?['name'] ??
+                        _userProfile?.displayName ??
                             user?.email?.split('@')[0] ??
                             '未設定名稱',
                         style: const TextStyle(
