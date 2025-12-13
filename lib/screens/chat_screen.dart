@@ -136,8 +136,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 // 在消息加载完成后滚动到底部
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (_scrollController.hasClients) {
-                    _scrollController.jumpTo(
+                    _scrollController.animateTo(
                       _scrollController.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
                     );
                   }
                 });
@@ -145,10 +147,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
-                  reverse: true,
+                  reverse: false,
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    final message = messages[messages.length - 1 - index];
+                    final message = messages[index];
                     final isMe =
                         message.senderId == _authService.currentUser?.id;
 
