@@ -584,15 +584,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     ),
                     onTap: () => _startPrivateChat(widget.activity.creatorId),
                   ),
-                  // 其他參加者
-                  ..._participants.map(
-                    (participant) => ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(participant['email'] ?? '參加者'),
-                      trailing: const Icon(Icons.chat_bubble_outline, size: 20),
-                      onTap: () => _startPrivateChat(participant['user_id']),
-                    ),
-                  ),
+                  // 其他參加者（過濾掉創建者）
+                  ..._participants
+                      .where((p) => p['user_id'] != widget.activity.creatorId)
+                      .map(
+                        (participant) => ListTile(
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.person),
+                          ),
+                          title: Text(participant['email'] ?? '參加者'),
+                          trailing:
+                              const Icon(Icons.chat_bubble_outline, size: 20),
+                          onTap: () =>
+                              _startPrivateChat(participant['user_id']),
+                        ),
+                      ),
                 ],
               ),
             ),
