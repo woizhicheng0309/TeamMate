@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 import '../services/database_service.dart';
+import 'edit_profile_screen.dart';
+import 'sports_preferences_screen.dart';
+import 'notification_settings_screen.dart';
+import 'privacy_settings_screen.dart';
+import 'help_center_screen.dart';
+import 'about_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -128,8 +134,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         leading: const Icon(Icons.edit),
                         title: const Text('編輯個人資料'),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          // TODO: Navigate to edit profile screen
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const EditProfileScreen(),
+                            ),
+                          );
+                          if (result == true) {
+                            _loadUserProfile();
+                          }
                         },
                       ),
                       const Divider(),
@@ -138,7 +152,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: const Text('運動偏好'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Navigate to preferences screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SportsPreferencesScreen(),
+                            ),
+                          );
                         },
                       ),
                       const Divider(),
@@ -147,7 +166,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: const Text('通知設定'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Navigate to notification settings
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationSettingsScreen(),
+                            ),
+                          );
                         },
                       ),
                       const Divider(),
@@ -156,7 +180,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: const Text('隱私設定'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Navigate to privacy settings
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacySettingsScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],
@@ -173,7 +202,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: const Text('幫助中心'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Navigate to help center
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HelpCenterScreen(),
+                            ),
+                          );
                         },
                       ),
                       const Divider(),
@@ -182,7 +216,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: const Text('關於我們'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Navigate to about screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AboutScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],
