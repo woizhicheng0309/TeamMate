@@ -11,9 +11,13 @@ class Activity {
   final String? address;
   final int maxParticipants;
   final int currentParticipants;
-  final String status; // 'open', 'full', 'completed', 'cancelled', 'ended'
+  final String status; // 'open', 'full', 'completed', 'cancelled', 'ended', 'failed'
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? checkInStartTime;
+  final String? checkInCode;
+  final bool? creatorCheckedIn;
+  final DateTime? creatorCheckInTime;
 
   Activity({
     required this.id,
@@ -31,6 +35,10 @@ class Activity {
     this.status = 'open',
     required this.createdAt,
     required this.updatedAt,
+    this.checkInStartTime,
+    this.checkInCode,
+    this.creatorCheckedIn,
+    this.creatorCheckInTime,
   });
 
   factory Activity.fromJson(Map<String, dynamic> json) {
@@ -50,6 +58,14 @@ class Activity {
       status: json['status'] as String? ?? 'open',
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      checkInStartTime: json['check_in_start_time'] != null
+          ? DateTime.parse(json['check_in_start_time'] as String)
+          : null,
+      checkInCode: json['check_in_code'] as String?,
+      creatorCheckedIn: json['creator_checked_in'] as bool?,
+      creatorCheckInTime: json['creator_check_in_time'] != null
+          ? DateTime.parse(json['creator_check_in_time'] as String)
+          : null,
     );
   }
 
@@ -70,6 +86,10 @@ class Activity {
       'status': status,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'check_in_start_time': checkInStartTime?.toIso8601String(),
+      'check_in_code': checkInCode,
+      'creator_checked_in': creatorCheckedIn,
+      'creator_check_in_time': creatorCheckInTime?.toIso8601String(),
     };
   }
 
@@ -77,7 +97,7 @@ class Activity {
   bool get isOpen => status == 'open' && !isFull;
   bool get isPast => eventDate.isBefore(DateTime.now());
   bool get isEnded =>
-      status == 'ended' || status == 'completed' || status == 'cancelled';
+      status == 'ended' || status == 'completed' || status == 'cancelled' || status == 'failed';
 
   Activity copyWith({
     String? id,
@@ -95,6 +115,10 @@ class Activity {
     String? status,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? checkInStartTime,
+    String? checkInCode,
+    bool? creatorCheckedIn,
+    DateTime? creatorCheckInTime,
   }) {
     return Activity(
       id: id ?? this.id,
@@ -112,6 +136,10 @@ class Activity {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      checkInStartTime: checkInStartTime ?? this.checkInStartTime,
+      checkInCode: checkInCode ?? this.checkInCode,
+      creatorCheckedIn: creatorCheckedIn ?? this.creatorCheckedIn,
+      creatorCheckInTime: creatorCheckInTime ?? this.creatorCheckInTime,
     );
   }
 }
