@@ -190,23 +190,23 @@ class ChatService {
       for (final participantId in participants) {
         if (participantId != senderId) {
           // 調用 Supabase Edge Function 發送通知
-          _supabase.functions.invoke(
-            'send-push-notification',
-            body: {
-              'userId': participantId,
-              'title': '新消息',
-              'message': '$senderName: $message',
-              'type': 'chat',
-              'data': {
-                'chat_id': chatId,
-                'sender_id': senderId,
-              }
-            },
-          ).then((_) {
-            print('✅ 推送通知已發送給用戶: $participantId');
-          }).catchError((error) {
-            print('⚠️ 發送推送通知失敗: $error');
-          });
+          _supabase.functions
+              .invoke(
+                'send-push-notification',
+                body: {
+                  'userId': participantId,
+                  'title': '新消息',
+                  'message': '$senderName: $message',
+                  'type': 'chat',
+                  'data': {'chat_id': chatId, 'sender_id': senderId},
+                },
+              )
+              .then((_) {
+                print('✅ 推送通知已發送給用戶: $participantId');
+              })
+              .catchError((error) {
+                print('⚠️ 發送推送通知失敗: $error');
+              });
         }
       }
     } catch (e) {
