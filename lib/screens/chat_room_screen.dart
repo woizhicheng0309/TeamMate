@@ -35,10 +35,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> _markAsRead() async {
     final userId = _authService.userId;
     if (userId != null) {
-      await _chatService.markMessagesAsRead(
-        chatId: widget.chat.id,
-        userId: userId,
-      );
+      await _chatService.markMessagesAsRead(widget.chat.id, userId);
     }
   }
 
