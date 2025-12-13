@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import '../models/activity.dart';
 import '../models/join_request.dart';
 import '../services/database_service.dart';
@@ -31,6 +32,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   bool _hasPendingRequest = false;
   List<Map<String, dynamic>> _participants = [];
   List<JoinRequest> _pendingRequests = [];
+  late Timer _checkInWindowTimer;
 
   @override
   void initState() {
@@ -39,6 +41,26 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     _loadParticipants();
     _checkPendingRequest();
     _loadPendingRequests();
+    
+    // 添加定时器在打卡窗口期间每秒刷新 UI
+    _checkInWindowTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final now = DateTime.now();
+      final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
+      final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
+      
+      // 如果在打卡窗口内，就刷新 UI
+      if (now.isAfter(checkInStart) && now.isBefore(checkInEnd)) {
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _checkInWindowTimer.cancel();
+    super.dispose();
   }
 
   Future<void> _checkIfJoined() async {
