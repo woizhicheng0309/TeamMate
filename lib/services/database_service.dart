@@ -95,7 +95,12 @@ class DatabaseService {
           .select()
           .single();
 
-      return Activity.fromJson(response);
+      final createdActivity = Activity.fromJson(response);
+
+      // 自動將創建者加入活動
+      await joinActivity(createdActivity.id, createdActivity.creatorId);
+
+      return createdActivity;
     } catch (e) {
       print('Error creating activity: $e');
       rethrow;
@@ -104,14 +109,94 @@ class DatabaseService {
 
   Future<void> joinActivity(String activityId, String userId) async {
     try {
-      await _supabase.from('activity_participants').insert({
+      // 檢查是否已經加入
+      final existing = await _supabase
+          .from('participants')
+          .select()
+          .eq('activity_id', activityId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing != null) {
+        // 已經是參與者，直接返回
+        return;
+      }
+
+      // 插入參與者記錄
+      await _supabase.from('participants').insert({
         'activity_id': activityId,
         'user_id': userId,
         'joined_at': DateTime.now().toIso8601String(),
       });
+
+      // 更新活動的當前參加人數
+      final activity = await _supabase
+          .from('activities')
+          .select('current_participants')
+          .eq('id', activityId)
+          .single();
+
+      await _supabase
+          .from('activities')
+          .update({
+            'current_participants': (activity['current_participants'] ?? 0) + 1,
+          })
+          .eq('id', activityId);
     } catch (e) {
       print('Error joining activity: $e');
       rethrow;
+    }
+  }
+
+  Future<void> leaveActivity(String activityId, String userId) async {
+    try {
+      // 刪除參與者記錄
+      await _supabase
+          .from('participants')
+          .delete()
+          .eq('activity_id', activityId)
+          .eq('user_id', userId);
+
+      // 更新活動的當前參加人數
+      final activity = await _supabase
+          .from('activities')
+          .select('current_participants')
+          .eq('id', activityId)
+          .single();
+
+      await _supabase
+          .from('activities')
+          .update({
+            'current_participants':
+                ((activity['current_participants'] ?? 1) - 1).clamp(0, 999),
+          })
+          .eq('id', activityId);
+    } catch (e) {
+      print('Error leaving activity: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getActivityParticipants(
+    String activityId,
+  ) async {
+    try {
+      final response = await _supabase
+          .from('participants')
+          .select('user_id, users(email, full_name, avatar_url)')
+          .eq('activity_id', activityId);
+
+      return (response as List).map((item) {
+        return {
+          'user_id': item['user_id'],
+          'email': item['users']?['email'],
+          'full_name': item['users']?['full_name'],
+          'avatar_url': item['users']?['avatar_url'],
+        };
+      }).toList();
+    } catch (e) {
+      print('Error getting activity participants: $e');
+      return [];
     }
   }
 

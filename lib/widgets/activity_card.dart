@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import '../models/activity.dart';
 import '../services/location_service.dart';
+import '../screens/activity_detail_screen.dart';
 
 class ActivityCard extends StatelessWidget {
   final Activity activity;
@@ -62,7 +63,12 @@ class ActivityCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: () {
-          // TODO: Navigate to activity details
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ActivityDetailScreen(activity: activity),
+            ),
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(16),

@@ -38,8 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _requestLocationPermission() async {
     try {
-      final hasPermission = await _locationService.checkPermissions()
-          .timeout(const Duration(seconds: 3));
+      final hasPermission = await _locationService.checkPermissions().timeout(
+        const Duration(seconds: 3),
+      );
       if (!hasPermission && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -70,7 +71,10 @@ class _HomeScreenState extends State<HomeScreen> {
             label: '建立',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.event), label: '活動'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: '聊天'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            label: '聊天',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: '我的'),
         ],
       ),

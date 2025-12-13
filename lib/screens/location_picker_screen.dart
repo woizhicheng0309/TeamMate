@@ -63,6 +63,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   Future<void> _getCurrentLocation() async {
     try {
+      if (!mounted) return;
       setState(() => _isLoading = true);
 
       final permission = await Geolocator.checkPermission();
@@ -77,6 +78,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       );
 
       final newLocation = LatLng(position.latitude, position.longitude);
+      if (!mounted) return;
       setState(() => _selectedLocation = newLocation);
 
       _mapController?.animateCamera(
@@ -87,7 +89,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     } catch (e) {
       print('Error getting current location: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -100,25 +104,30 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
-        setState(() {
-          _selectedAddress = [
-            place.street,
-            place.subLocality,
-            place.locality,
-            place.administrativeArea,
-          ].where((s) => s != null && s.isNotEmpty).join(', ');
-        });
+        if (mounted) {
+          setState(() {
+            _selectedAddress = [
+              place.street,
+              place.subLocality,
+              place.locality,
+              place.administrativeArea,
+            ].where((s) => s != null && s.isNotEmpty).join(', ');
+          });
+        }
       }
     } catch (e) {
       print('Error getting address: $e');
-      setState(() {
-        _selectedAddress =
-            '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}';
-      });
+      if (mounted) {
+        setState(() {
+          _selectedAddress =
+              '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}';
+        });
+      }
     }
   }
 
   void _onMapTapped(LatLng location) {
+    if (!mounted) return;
     setState(() {
       _selectedLocation = location;
       _selectedAddress = '載入中...';
@@ -128,6 +137,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     // 延遲載入設施以避免過度查詢
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
       if (widget.detectFacilities) {
         _loadFacilitiesAndSports(location);
       }

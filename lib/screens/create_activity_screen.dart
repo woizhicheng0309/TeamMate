@@ -5,6 +5,7 @@ import '../models/activity.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import 'location_picker_screen.dart';
 
 class CreateActivityScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final LocationService _locationService = LocationService();
   final AuthService _authService = AuthService();
+  final ChatService _chatService = ChatService();
 
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -79,32 +81,28 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         _address = result['address'] as String;
         _suitableSports = (result['suitableSports'] as List<String>?) ?? [];
         _hasSelectedLocation = true;
-        
+
         // 自动选择第一个适合的运动
         if (_suitableSports.isNotEmpty) {
           _selectedActivityType = _suitableSports.first;
         }
       });
-    } else {
-      // 用户取消了位置选择，返回上一页
-      if (mounted) {
-        Navigator.pop(context);
-      }
     }
+    // 如果用户取消选择，保持当前状态不变
   }
 
   Future<void> _createActivity() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('請選擇活動地點')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('請選擇活動地點')));
       return;
     }
     if (_selectedActivityType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('請選擇運動類型')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('請選擇運動類型')));
       return;
     }
 
@@ -151,6 +149,13 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
       await _databaseService.createActivity(activity);
 
+      // 創建初始群組聊天（只有創建者）
+      await _chatService.getOrCreateGroupChat(
+        activityId: activity.id,
+        groupName: activity.title,
+        participantIds: [activity.creatorId],
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -180,9 +185,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       // 显示加载指示器，等待地图选择
       return Scaffold(
         appBar: AppBar(title: const Text('建立新活動')),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -204,19 +207,13 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                 const SizedBox(height: 24),
                 const Text(
                   '此地點附近沒有適合的運動設施',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   _address ?? '未知地點',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
@@ -233,7 +230,17 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    // 重置状态，返回初始选择位置的界面
+                    if (mounted) {
+                      setState(() {
+                        _hasSelectedLocation = false;
+                        _selectedLocation = null;
+                        _address = null;
+                        _suitableSports = [];
+                      });
+                    }
+                  },
                   child: const Text('取消'),
                 ),
               ],
@@ -301,7 +308,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
               children: _suitableSports.map((sportKey) {
                 final sportInfo = _allSportsInfo[sportKey];
                 if (sportInfo == null) return const SizedBox.shrink();
-                
+
                 return ChoiceChip(
                   label: Text('${sportInfo['icon']} ${sportInfo['label']}'),
                   selected: _selectedActivityType == sportKey,

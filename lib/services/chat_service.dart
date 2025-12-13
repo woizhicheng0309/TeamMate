@@ -13,9 +13,13 @@ class ChatService {
         .order('last_message_time', ascending: false)
         .map((data) {
           return data
-              .where((chatData) =>
-                  chatData['user1_id'] == userId ||
-                  chatData['user2_id'] == userId)
+              .where(
+                (chatData) =>
+                    (chatData['participants'] as List<dynamic>?)?.contains(
+                      userId,
+                    ) ??
+                    false,
+              )
               .map((chatData) => Chat.fromJson(chatData))
               .toList();
         });
@@ -24,12 +28,23 @@ class ChatService {
   // Get or create a chat between two users
   Future<Chat> getOrCreateChat(String user1Id, String user2Id) async {
     try {
+      // Get user names for the chat
+      final user1Response = await _supabase
+          .from('users')
+          .select('full_name, email')
+          .eq('id', user2Id)
+          .single();
+
+      final user2Name =
+          (user1Response['full_name'] as String?) ??
+          (user1Response['email'] as String).split('@')[0];
+
       // Check if chat already exists
       final response = await _supabase
           .from('chats')
           .select()
-          .or('user1_id.eq.$user1Id,user2_id.eq.$user1Id')
-          .or('user1_id.eq.$user2Id,user2_id.eq.$user2Id')
+          .eq('type', 'private')
+          .contains('participants', [user1Id, user2Id])
           .maybeSingle();
 
       if (response != null) {
@@ -40,8 +55,10 @@ class ChatService {
       final newChat = await _supabase
           .from('chats')
           .insert({
-            'user1_id': user1Id,
-            'user2_id': user2Id,
+            'type': 'private',
+            'activity_id': null,
+            'name': user2Name,
+            'participants': [user1Id, user2Id],
             'last_message': null,
             'last_message_time': DateTime.now().toIso8601String(),
           })
@@ -55,10 +72,56 @@ class ChatService {
     }
   }
 
+  // Get or create a group chat for an activity
+  Future<Chat> getOrCreateGroupChat({
+    required String activityId,
+    required String groupName,
+    required List<String> participantIds,
+  }) async {
+    try {
+      // Check if group chat already exists for this activity
+      final response = await _supabase
+          .from('chats')
+          .select()
+          .eq('activity_id', activityId)
+          .eq('type', 'group')
+          .maybeSingle();
+
+      if (response != null) {
+        // Update participants list
+        await _supabase
+            .from('chats')
+            .update({'participants': participantIds})
+            .eq('id', response['id']);
+
+        return Chat.fromJson({...response, 'participants': participantIds});
+      }
+
+      // Create new group chat
+      final newChat = await _supabase
+          .from('chats')
+          .insert({
+            'type': 'group',
+            'activity_id': activityId,
+            'name': groupName,
+            'participants': participantIds,
+            'last_message': null,
+            'last_message_time': DateTime.now().toIso8601String(),
+          })
+          .select()
+          .single();
+
+      return Chat.fromJson(newChat);
+    } catch (e) {
+      print('Error getting or creating group chat: $e');
+      rethrow;
+    }
+  }
+
   // Get messages for a chat
   Stream<List<Message>> getChatMessages(String chatId) {
     return _supabase
-        .from('messages')
+        .from('chat_messages')
         .stream(primaryKey: ['id'])
         .eq('chat_id', chatId)
         .order('created_at', ascending: true)
@@ -74,7 +137,7 @@ class ChatService {
   }) async {
     try {
       // Insert message
-      await _supabase.from('messages').insert({
+      await _supabase.from('chat_messages').insert({
         'chat_id': chatId,
         'sender_id': senderId,
         'sender_name': senderName,
@@ -83,10 +146,13 @@ class ChatService {
       });
 
       // Update chat's last message
-      await _supabase.from('chats').update({
-        'last_message': content,
-        'last_message_time': DateTime.now().toIso8601String(),
-      }).eq('id', chatId);
+      await _supabase
+          .from('chats')
+          .update({
+            'last_message': content,
+            'last_message_time': DateTime.now().toIso8601String(),
+          })
+          .eq('id', chatId);
     } catch (e) {
       print('Error sending message: $e');
       rethrow;
@@ -97,7 +163,7 @@ class ChatService {
   Future<void> markMessagesAsRead(String chatId, String userId) async {
     try {
       await _supabase
-          .from('messages')
+          .from('chat_messages')
           .update({'is_read': true})
           .eq('chat_id', chatId)
           .neq('sender_id', userId)
@@ -111,7 +177,7 @@ class ChatService {
   Future<int> getUnreadCount(String chatId, String userId) async {
     try {
       final response = await _supabase
-          .from('messages')
+          .from('chat_messages')
           .select()
           .eq('chat_id', chatId)
           .neq('sender_id', userId)
