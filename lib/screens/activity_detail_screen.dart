@@ -394,6 +394,20 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final isFull =
         widget.activity.currentParticipants >= widget.activity.maxParticipants;
 
+    // 調試打卡窗口
+    final now = DateTime.now();
+    final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
+    final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
+    final inCheckInWindow = now.isAfter(checkInStart) && now.isBefore(checkInEnd);
+    
+    print('🔍 打卡調試:');
+    print('  當前時間: $now');
+    print('  活動時間: ${widget.activity.eventDate}');
+    print('  打卡窗口: $checkInStart ~ $checkInEnd');
+    print('  在窗口內: $inCheckInWindow');
+    print('  是創建者: $isCreator');
+    print('  已打卡: ${widget.activity.creatorCheckedIn}');
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.activity.title),
