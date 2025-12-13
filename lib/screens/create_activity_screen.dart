@@ -306,6 +306,8 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                             initialLocation: _latitude != null && _longitude != null
                                 ? LatLng(_latitude!, _longitude!)
                                 : null,
+                            detectFacilities: true,
+                            showActivities: true,
                           ),
                         ),
                       );
@@ -313,10 +315,17 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                       if (result != null) {
                         final location = result['location'] as LatLng;
                         final address = result['address'] as String;
+                        final suitableSports = result['suitableSports'] as List<String>?;
+                        
                         setState(() {
                           _latitude = location.latitude;
                           _longitude = location.longitude;
                           _address = address;
+                          
+                          // 如果檢測到適合的運動，自動選擇第一個
+                          if (suitableSports != null && suitableSports.isNotEmpty) {
+                            _selectedActivityType = suitableSports.first;
+                          }
                         });
                       }
                     },

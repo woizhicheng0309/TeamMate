@@ -1,14 +1,22 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../services/overpass_service.dart';
+import '../services/database_service.dart';
+import '../models/activity.dart';
 
 class LocationPickerScreen extends StatefulWidget {
   final LatLng? initialLocation;
+  final bool showActivities; // 是否顯示其他活動
+  final bool detectFacilities; // 是否檢測設施
 
   const LocationPickerScreen({
     super.key,
     this.initialLocation,
+    this.showActivities = false,
+    this.detectFacilities = true,
   });
 
   @override
@@ -20,6 +28,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   LatLng _selectedLocation = const LatLng(24.1797, 120.6486); // 台中預設
   String _selectedAddress = '載入中...';
   bool _isLoading = false;
+  
+  final OverpassService _overpassService = OverpassService();
+  final DatabaseService _databaseService = DatabaseService();
+  
+  List<SportsFacility> _facilities = [];
+  List<Activity> _nearbyActivities = [];
+  Set<Marker> _markers = {};
+  List<String> _suitableSports = [];
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -29,6 +46,19 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     }
     _getCurrentLocation();
     _updateAddress(_selectedLocation);
+    if (widget.detectFacilities) {
+      _loadFacilitiesAndSports(_selectedLocation);
+    }
+    if (widget.showActivities) {
+      _loadNearbyActivities(_selectedLocation);
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _mapController?.dispose();
+    super.dispose();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -94,12 +124,112 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _selectedAddress = '載入中...';
     });
     _updateAddress(location);
+    
+    // 延遲載入設施以避免過度查詢
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (widget.detectFacilities) {
+        _loadFacilitiesAndSports(location);
+      }
+      if (widget.showActivities) {
+        _loadNearbyActivities(location);
+      }
+    });
+  }
+
+  /// 載入運動設施和檢測適合的運動
+  Future<void> _loadFacilitiesAndSports(LatLng location) async {
+    try {
+      final facilities = await _overpassService.queryNearbyFacilities(
+        latitude: location.latitude,
+        longitude: location.longitude,
+        radiusMeters: 50,
+      );
+
+      final suitableSports = await _overpassService.detectSuitableSports(
+        latitude: location.latitude,
+        longitude: location.longitude,
+        radiusMeters: 50,
+      );
+
+      if (mounted) {
+        setState(() {
+          _facilities = facilities;
+          _suitableSports = suitableSports;
+        });
+        _updateMarkers();
+      }
+    } catch (e) {
+      print('Error loading facilities: $e');
+    }
+  }
+
+  /// 載入附近的活動
+  Future<void> _loadNearbyActivities(LatLng location) async {
+    try {
+      final activities = await _databaseService.getNearbyActivities(
+        latitude: location.latitude,
+        longitude: location.longitude,
+        radiusKm: 5.0,
+      );
+
+      if (mounted) {
+        setState(() {
+          _nearbyActivities = activities;
+        });
+        _updateMarkers();
+      }
+    } catch (e) {
+      print('Error loading activities: $e');
+    }
+  }
+
+  /// 更新地圖標記
+  void _updateMarkers() {
+    final markers = <Marker>{};
+
+    // 選擇的位置標記
+    markers.add(
+      Marker(
+        markerId: const MarkerId('selected'),
+        position: _selectedLocation,
+        draggable: true,
+        onDragEnd: _onMapTapped,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        infoWindow: InfoWindow(
+          title: '選擇的位置',
+          snippet: _suitableSports.isNotEmpty
+              ? '適合: ${_suitableSports.map((s) => OverpassService.getSportNameChinese(s)).join(', ')}'
+              : '附近無運動設施',
+        ),
+      ),
+    );
+
+    // 活動標記
+    for (final activity in _nearbyActivities) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('activity_${activity.id}'),
+          position: LatLng(activity.latitude, activity.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(
+            title: '${OverpassService.getSportEmoji(activity.activityType)} ${activity.title}',
+            snippet: '${activity.currentParticipants}/${activity.maxParticipants} 人',
+          ),
+        ),
+      );
+    }
+
+    setState(() => _markers = markers);
   }
 
   void _confirmLocation() {
     Navigator.pop(context, {
       'location': _selectedLocation,
       'address': _selectedAddress,
+      'suitableSports': _suitableSports,
     });
   }
 
@@ -128,18 +258,92 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             onTap: _onMapTapped,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
-            markers: {
-              Marker(
-                markerId: const MarkerId('selected'),
-                position: _selectedLocation,
-                draggable: true,
-                onDragEnd: _onMapTapped,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueBlue,
-                ),
-              ),
+            markers: _markers,
+            onCameraMove: (position) {
+              // 延遲重新載入以避免過度查詢
+              _debounceTimer?.cancel();
+              _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+                if (widget.detectFacilities || widget.showActivities) {
+                  final center = position.target;
+                  if (widget.detectFacilities) {
+                    _loadFacilitiesAndSports(center);
+                  }
+                  if (widget.showActivities) {
+                    _loadNearbyActivities(center);
+                  }
+                }
+              });
             },
           ),
+
+          // Suitable Sports Info (if detectFacilities enabled)
+          if (widget.detectFacilities)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Card(
+                color: _suitableSports.isEmpty
+                    ? Colors.orange.shade100
+                    : Colors.green.shade100,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: _suitableSports.isEmpty
+                      ? const Row(
+                          children: [
+                            Icon(Icons.warning, color: Colors.orange),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '此處沒有適合的運動設施',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.check_circle,
+                                    color: Colors.green),
+                                SizedBox(width: 8),
+                                Text(
+                                  '此處適合的運動',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: _suitableSports.map((sport) {
+                                return Chip(
+                                  label: Text(
+                                    '${OverpassService.getSportEmoji(sport)} ${OverpassService.getSportNameChinese(sport)}',
+                                  ),
+                                  backgroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
 
           // Address Card at bottom
           Positioned(
@@ -174,6 +378,18 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         fontSize: 14,
                       ),
                     ),
+                    if (widget.showActivities && _nearbyActivities.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      const Divider(),
+                      Text(
+                        '附近有 ${_nearbyActivities.length} 個活動',
+                        style: TextStyle(
+                          color: Colors.orange[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
@@ -207,11 +423,5 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _mapController?.dispose();
-    super.dispose();
   }
 }
