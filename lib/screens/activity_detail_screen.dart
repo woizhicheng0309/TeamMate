@@ -6,7 +6,10 @@ import '../services/database_service.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
 import '../services/overpass_service.dart';
+import '../services/check_in_service.dart';
 import 'chat_screen.dart';
+import 'creator_check_in_screen.dart';
+import 'participant_check_in_screen.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
   final Activity activity;
@@ -21,6 +24,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
+  final CheckInService _checkInService = CheckInService();
 
   bool _isJoining = false;
   bool _hasJoined = false;
@@ -473,6 +477,32 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ),
           const SizedBox(height: 16),
 
+          // 打卡狀態顯示
+          if (widget.activity.creatorCheckedIn)
+            Card(
+              color: Colors.green.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '創建者已打卡 - 密碼: ${widget.activity.checkInCode}',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+
           // 活動詳情
           Card(
             child: Padding(
@@ -678,6 +708,56 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ),
             const SizedBox(height: 16),
           ],
+
+          // 打卡按鈕（創建者）
+          if (isCreator && widget.activity.eventDate.isBefore(DateTime.now().add(const Duration(hours: 1))))
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CreatorCheckInScreen(
+                        activity: widget.activity,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.location_on),
+                label: const Text('開始打卡'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+
+          // 打卡確認按鈕（參與者）
+          if (!isCreator && _hasJoined && widget.activity.eventDate.isBefore(DateTime.now().add(const Duration(hours: 1))))
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ParticipantCheckInScreen(
+                        activity: widget.activity,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.verified_user),
+                label: const Text('確認打卡'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 16),
 
           // 加入/退出按鈕
           if (!isCreator)
