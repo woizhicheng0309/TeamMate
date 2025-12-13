@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/activity.dart';
 import '../services/check_in_service.dart';
 import '../services/auth_service.dart';
@@ -281,14 +282,35 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                               color: Colors.grey[100],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
-                              _checkInCode ?? 'XXXX',
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 8,
-                                fontFamily: 'Courier',
-                              ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _checkInCode ?? '0000',
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 12,
+                                    fontFamily: 'monospace',
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                IconButton(
+                                  icon: const Icon(Icons.content_copy),
+                                  onPressed: _checkInCode != null
+                                      ? () {
+                                          Clipboard.setData(ClipboardData(text: _checkInCode!));
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('已複製密碼: $_checkInCode'),
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
+                                      : null,
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 16),
