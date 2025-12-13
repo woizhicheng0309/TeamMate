@@ -133,8 +133,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
 
-                // 在消息加载完成后滚动到底部
-                WidgetsBinding.instance.addPostFrameCallback((_) {
+                // 在消息加载完成后立即滚动到底部
+                Future.delayed(const Duration(milliseconds: 100), () {
                   if (_scrollController.hasClients) {
                     _scrollController.animateTo(
                       _scrollController.position.maxScrollExtent,
