@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
+import '../services/database_service.dart';
+import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import 'chat_room_screen.dart';
 
@@ -14,154 +16,165 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
+  final DatabaseService _db = DatabaseService();
+  String _category = 'stranger'; // 保留（若需狀態外用）
 
   @override
   Widget build(BuildContext context) {
     final userId = _authService.userId;
-
     if (userId == null) {
       return const Scaffold(body: Center(child: Text('請先登入')));
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('聊天'), elevation: 0),
-      body: StreamBuilder<List<Chat>>(
-        stream: _chatService.getUserChats(userId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('聊天'),
+          elevation: 0,
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: '陌生人'),
+              Tab(text: '好友'),
+              Tab(text: '群組'),
+            ],
+          ),
+        ),
+        body: StreamBuilder<List<Chat>>(
+          stream: _chatService.getUserChats(userId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          if (snapshot.hasError) {
-            return Center(child: Text('錯誤: ${snapshot.error}'));
-          }
+            if (snapshot.hasError) {
+              return Center(child: Text('錯誤: ${snapshot.error}'));
+            }
 
-          final chats = snapshot.data ?? [];
+            final chats = snapshot.data ?? [];
 
-          if (chats.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            if (chats.isEmpty) {
+              return const TabBarView(
                 children: [
-                  Icon(
-                    Icons.chat_bubble_outline,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '還沒有聊天記錄',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '加入活動或私信其他用戶開始聊天',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
+                  Center(child: Text('沒有聊天')),
+                  Center(child: Text('沒有聊天')),
+                  Center(child: Text('沒有聊天')),
                 ],
-              ),
-            );
-          }
-
-          // 分离置顶和未置顶的聊天
-          final pinnedChats = chats.where((c) => c.isPinned ?? false).toList();
-          final unpinnedChats = chats
-              .where((c) => !(c.isPinned ?? false))
-              .toList();
-
-          // 合并：置顶在前
-          final sortedChats = [...pinnedChats, ...unpinnedChats];
-
-          return ListView.builder(
-            itemCount: sortedChats.length,
-            itemBuilder: (context, index) {
-              final chat = sortedChats[index];
-              return Dismissible(
-                key: Key(chat.id),
-                direction: DismissDirection.horizontal,
-                background: Container(
-                  color: Colors.orange,
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.only(left: 16),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        chat.isPinned ?? false
-                            ? Icons.push_pin_outlined
-                            : Icons.push_pin,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        chat.isPinned ?? false ? '取消置頂' : '置頂',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                secondaryBackground: Container(
-                  color: Colors.red,
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 16),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Icon(Icons.delete, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text(
-                        '刪除',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                onDismissed: (direction) {
-                  if (direction == DismissDirection.startToEnd) {
-                    // 置頂/取消置頂
-                    _togglePinChat(chat);
-                  } else {
-                    // 刪除
-                    _deleteChat(chat);
-                  }
-                },
-                child: _buildChatItem(chat, userId),
               );
-            },
-          );
-        },
+            }
+
+            final pinnedChats = chats.where((c) => c.isPinned ?? false).toList();
+            final unpinnedChats = chats.where((c) => !(c.isPinned ?? false)).toList();
+            final sorted = [...pinnedChats, ...unpinnedChats];
+
+            final groupChats = sorted.where((c) => c.type == 'group').toList();
+            final privateChats = sorted.where((c) => c.type != 'group').toList();
+            final friendChats = <Chat>[];
+
+            List<Widget> buildChildren(List<Chat> items) {
+              return items.map((chat) {
+                return Dismissible(
+                  key: Key(chat.id),
+                  direction: DismissDirection.horizontal,
+                  background: _pinBackground(chat),
+                  secondaryBackground: _deleteBackground(),
+                  onDismissed: (direction) {
+                    if (direction == DismissDirection.startToEnd) {
+                      _togglePinChat(chat);
+                    } else {
+                      _deleteChat(chat);
+                    }
+                  },
+                  child: _buildChatItem(chat, userId),
+                );
+              }).toList();
+            }
+
+            return TabBarView(
+              children: [
+                ListView(children: buildChildren(privateChats)),
+                ListView(children: buildChildren(friendChats)),
+                ListView(children: buildChildren(groupChats)),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // 已移除分段標題，改用上方 ChoiceChips 切換分類
+
+  Widget _pinBackground(Chat chat) {
+    return Container(
+      color: Colors.orange,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 16),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            chat.isPinned ?? false ? Icons.push_pin_outlined : Icons.push_pin,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            chat.isPinned ?? false ? '取消置頂' : '置頂',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _deleteBackground() {
+    return Container(
+      color: Colors.red,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 16),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Icon(Icons.delete, color: Colors.white),
+          SizedBox(width: 8),
+          Text('刪除', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
 
   Widget _buildChatItem(Chat chat, String currentUserId) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: chat.type == 'group' ? Colors.blue : Colors.green,
-        child: chat.avatarUrl != null
-            ? ClipOval(
-                child: Image.network(
-                  chat.avatarUrl!,
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
-                    chat.type == 'group' ? Icons.group : Icons.person,
-                    color: Colors.white,
+      leading: GestureDetector(
+        onTap: () async {
+          if (chat.type == 'group') return; // 群組不顯示個人資料
+          final otherId = chat.participants.firstWhere((p) => p != currentUserId, orElse: () => '');
+          if (otherId.isEmpty) return;
+          final profile = await _db.getUserProfile(otherId);
+          if (!mounted) return;
+          _showUserInfoSheet(context, profile, otherId);
+        },
+        child: CircleAvatar(
+          backgroundColor: chat.type == 'group' ? Colors.blue : Colors.green,
+          child: chat.avatarUrl != null
+              ? ClipOval(
+                  child: Image.network(
+                    chat.avatarUrl!,
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                      chat.type == 'group' ? Icons.group : Icons.person,
+                      color: Colors.white,
+                    ),
                   ),
+                )
+              : Icon(
+                  chat.type == 'group' ? Icons.group : Icons.person,
+                  color: Colors.white,
                 ),
-              )
-            : Icon(
-                chat.type == 'group' ? Icons.group : Icons.person,
-                color: Colors.white,
-              ),
+        ),
       ),
       title: Row(
         children: [
@@ -233,6 +246,73 @@ class _ChatListScreenState extends State<ChatListScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => ChatRoomScreen(chat: chat)),
+        );
+      },
+    );
+  }
+
+  void _showUserInfoSheet(BuildContext context, UserProfile? profile, String userId) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage: (profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty)
+                      ? NetworkImage(profile.photoUrl!)
+                        : null,
+                    child: (profile?.photoUrl == null || (profile?.photoUrl?.isEmpty ?? true))
+                        ? const Icon(Icons.person, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(profile?.displayName ?? '未知用戶', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        if (profile?.email != null)
+                          Text(profile!.email!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已送出好友邀請'), duration: Duration(seconds: 2)),
+                      );
+                      // TODO: 接入真正的好友申請 API
+                    },
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('加好友'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text('運動偏好', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: (profile?.interests ?? const <String>[])
+                    .map((s) => Chip(label: Text(s)))
+                    .toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
         );
       },
     );

@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
+import '../services/database_service.dart';
+import '../models/user_profile.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final Chat chat;
@@ -16,6 +18,8 @@ class ChatRoomScreen extends StatefulWidget {
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
+  final DatabaseService _db = DatabaseService();
+  final Map<String, String?> _avatarCache = {};
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -181,6 +185,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Widget _buildMessage(Message message, bool isMe) {
+    final String? cachedAvatar = _avatarCache[message.senderId];
+    final String? effectiveAvatar = message.senderAvatar ?? cachedAvatar;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -189,28 +196,35 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.blue,
-              child: message.senderAvatar != null
-                  ? ClipOval(
-                      child: Image.network(
-                        message.senderAvatar!,
-                        width: 32,
-                        height: 32,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 18,
+            GestureDetector(
+              onTap: () async {
+                final profile = await _db.getUserProfile(message.senderId);
+                if (!mounted) return;
+                _showUserInfoSheet(context, profile, message.senderId);
+              },
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.blue,
+                child: effectiveAvatar != null
+                    ? ClipOval(
+                        child: Image.network(
+                          effectiveAvatar,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
+                      )
+                    : const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 18,
                       ),
-                    )
-                  : const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 18,
-                    ),
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -262,6 +276,84 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // 當接收到訊息時，嘗試預載入缺失的頭像（僅對方）
+  Future<void> _ensureAvatar(String userId) async {
+    if (_avatarCache.containsKey(userId)) return;
+    try {
+      final profile = await _db.getUserProfile(userId);
+      final url = profile?.photoUrl;
+      _avatarCache[userId] = url;
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  void _showUserInfoSheet(BuildContext context, UserProfile? profile, String userId) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage: (profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty)
+                        ? NetworkImage(profile.photoUrl!)
+                        : null,
+                    child: (profile?.photoUrl == null || (profile?.photoUrl?.isEmpty ?? true))
+                        ? const Icon(Icons.person, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(profile?.displayName ?? '未知用戶', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        if (profile?.email != null)
+                          Text(profile!.email!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已送出好友邀請'), duration: Duration(seconds: 2)),
+                      );
+                      // TODO: 接入真正的好友申請 API
+                    },
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('加好友'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text('運動偏好', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: (profile?.interests ?? const <String>[])
+                    .map((s) => Chip(label: Text(s)))
+                    .toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -197,11 +197,23 @@ class ChatService {
     required String content,
   }) async {
     try {
-      // Insert message
+      // 查詢發送者頭像，並一併寫入訊息
+      String? senderAvatar;
+      try {
+        final profile = await _supabase
+            .from('users')
+            .select('avatar_url')
+            .eq('id', senderId)
+            .maybeSingle();
+        senderAvatar = profile != null ? profile['avatar_url'] as String? : null;
+      } catch (_) {}
+
+      // Insert message（包含 sender_avatar）
       await _supabase.from('chat_messages').insert({
         'chat_id': chatId,
         'sender_id': senderId,
         'sender_name': senderName,
+        'sender_avatar': senderAvatar,
         'content': content,
         'created_at': DateTime.now().toIso8601String(),
       });
