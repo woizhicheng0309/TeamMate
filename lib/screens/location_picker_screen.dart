@@ -43,14 +43,17 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     super.initState();
     if (widget.initialLocation != null) {
       _selectedLocation = widget.initialLocation!;
-    }
-    _getCurrentLocation();
-    _updateAddress(_selectedLocation);
-    if (widget.detectFacilities) {
-      _loadFacilitiesAndSports(_selectedLocation);
-    }
-    if (widget.showActivities) {
-      _loadNearbyActivities(_selectedLocation);
+      _updateAddress(_selectedLocation);
+      // 只在有初始位置时加载设施
+      if (widget.detectFacilities) {
+        _loadFacilitiesAndSports(_selectedLocation);
+      }
+      if (widget.showActivities) {
+        _loadNearbyActivities(_selectedLocation);
+      }
+    } else {
+      // 没有初始位置时才获取当前位置
+      _getCurrentLocation();
     }
   }
 
@@ -86,6 +89,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       );
 
       await _updateAddress(newLocation);
+
+      // 获取当前位置后加载设施
+      if (widget.detectFacilities) {
+        _loadFacilitiesAndSports(newLocation);
+      }
+      if (widget.showActivities) {
+        _loadNearbyActivities(newLocation);
+      }
     } catch (e) {
       print('Error getting current location: $e');
     } finally {

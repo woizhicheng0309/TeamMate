@@ -10,7 +10,7 @@ class ChatService {
     return _supabase
         .from('chats')
         .stream(primaryKey: ['id'])
-        .order('last_message_time', ascending: false)
+        .order('last_message_time', ascending: true)
         .map((data) {
           return data
               .where(

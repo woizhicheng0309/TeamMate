@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/activity.dart';
 import '../models/user_profile.dart';
+import '../models/join_request.dart';
 
 class DatabaseService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -215,6 +216,28 @@ class DatabaseService {
     }
   }
 
+  Future<void> deleteActivity(String activityId) async {
+    try {
+      // 由於有 CASCADE 外鍵，刪除活動會自動刪除相關的參與者、評分、聊天等記錄
+      await _supabase.from('activities').delete().eq('id', activityId);
+    } catch (e) {
+      print('Error deleting activity: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> endActivity(String activityId) async {
+    try {
+      await _supabase
+          .from('activities')
+          .update({'status': 'ended'})
+          .eq('id', activityId);
+    } catch (e) {
+      print('Error ending activity: $e');
+      rethrow;
+    }
+  }
+
   // Rating Operations
   Future<void> rateActivity(
     String activityId,
@@ -309,6 +332,201 @@ class DatabaseService {
     };
 
     return controller.stream;
+  }
+
+  // Join Request Operations
+  Future<void> createJoinRequest(String activityId, String userId) async {
+    try {
+      // 檢查是否已有待處理的申請
+      final existing = await _supabase
+          .from('join_requests')
+          .select()
+          .eq('activity_id', activityId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing != null) {
+        if (existing['status'] == 'pending') {
+          throw Exception('您已經提交過申請，請等待創建者回應');
+        } else if (existing['status'] == 'accepted') {
+          throw Exception('您的申請已經被接受');
+        } else if (existing['status'] == 'rejected') {
+          // 如果之前被拒絕，可以重新申請
+          await _supabase
+              .from('join_requests')
+              .update({
+                'status': 'pending',
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', existing['id']);
+          return;
+        }
+      }
+
+      // 創建新申請
+      await _supabase.from('join_requests').insert({
+        'activity_id': activityId,
+        'user_id': userId,
+        'status': 'pending',
+      });
+    } catch (e) {
+      print('Error creating join request: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<JoinRequest>> getActivityJoinRequests(
+    String activityId, {
+    String? status,
+  }) async {
+    try {
+      var query = _supabase
+          .from('join_requests')
+          .select('''
+            *,
+            user:users(id, full_name, email, avatar_url)
+          ''')
+          .eq('activity_id', activityId);
+
+      if (status != null) {
+        query = query.eq('status', status);
+      }
+
+      final response = await query.order('created_at', ascending: false);
+      return (response as List)
+          .map((json) => JoinRequest.fromJson(json))
+          .toList();
+    } catch (e) {
+      print('Error getting join requests: $e');
+      return [];
+    }
+  }
+
+  Future<int> getPendingRequestCount(String activityId) async {
+    try {
+      final response = await _supabase
+          .from('join_requests')
+          .select()
+          .eq('activity_id', activityId)
+          .eq('status', 'pending');
+
+      return (response as List).length;
+    } catch (e) {
+      print('Error getting pending request count: $e');
+      return 0;
+    }
+  }
+
+  Future<Map<String, int>> getPendingRequestCounts(
+    List<String> activityIds,
+  ) async {
+    try {
+      final response = await _supabase
+          .from('join_requests')
+          .select('activity_id')
+          .inFilter('activity_id', activityIds)
+          .eq('status', 'pending');
+
+      final counts = <String, int>{};
+      for (final activityId in activityIds) {
+        counts[activityId] = 0;
+      }
+
+      for (final item in response) {
+        final activityId = item['activity_id'] as String;
+        counts[activityId] = (counts[activityId] ?? 0) + 1;
+      }
+
+      return counts;
+    } catch (e) {
+      print('Error getting pending request counts: $e');
+      return {};
+    }
+  }
+
+  Future<void> acceptJoinRequest(String requestId) async {
+    try {
+      // 獲取申請資訊
+      final request = await _supabase
+          .from('join_requests')
+          .select()
+          .eq('id', requestId)
+          .single();
+
+      final activityId = request['activity_id'] as String;
+      final userId = request['user_id'] as String;
+
+      // 檢查是否已經是參與者
+      final existing = await _supabase
+          .from('participants')
+          .select()
+          .eq('activity_id', activityId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing == null) {
+        // 添加為參與者
+        await _supabase.from('participants').insert({
+          'activity_id': activityId,
+          'user_id': userId,
+        });
+
+        // 更新活動參與人數
+        await _supabase.rpc(
+          'increment_participant_count',
+          params: {'activity_id': activityId},
+        );
+
+        // 獲取群組聊天並添加用戶
+        final groupChat = await _supabase
+            .from('chats')
+            .select()
+            .eq('activity_id', activityId)
+            .eq('is_group', true)
+            .maybeSingle();
+
+        if (groupChat != null) {
+          final chatId = groupChat['id'];
+          final participants = List<String>.from(
+            groupChat['participants'] ?? [],
+          );
+          if (!participants.contains(userId)) {
+            participants.add(userId);
+            await _supabase
+                .from('chats')
+                .update({'participants': participants})
+                .eq('id', chatId);
+          }
+        }
+      }
+
+      // 更新申請狀態為已接受
+      await _supabase
+          .from('join_requests')
+          .update({
+            'status': 'accepted',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', requestId);
+    } catch (e) {
+      print('Error accepting join request: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> rejectJoinRequest(String requestId) async {
+    try {
+      await _supabase
+          .from('join_requests')
+          .update({
+            'status': 'rejected',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', requestId);
+    } catch (e) {
+      print('Error rejecting join request: $e');
+      rethrow;
+    }
   }
 
   // Cleanup

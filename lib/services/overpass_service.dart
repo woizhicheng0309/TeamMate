@@ -6,6 +6,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class OverpassService {
   static const String _overpassUrl = 'https://overpass-api.de/api/interpreter';
 
+  // 添加缓存以减少重复请求
+  static final Map<String, dynamic> _cache = {};
+  static DateTime? _lastRequestTime;
+
+  // 最小请求间隔（毫秒）
+  static const int _minRequestInterval = 1000;
+
   /// 運動設施類型映射
   static const Map<String, List<String>> sportFacilityTags = {
     'basketball': ['sport=basketball', 'leisure=pitch&sport=basketball'],
@@ -25,6 +32,30 @@ class OverpassService {
     double radiusMeters = 500,
   }) async {
     try {
+      // 生成缓存键
+      final cacheKey =
+          '${latitude.toStringAsFixed(4)}_${longitude.toStringAsFixed(4)}_$radiusMeters';
+
+      // 检查缓存
+      if (_cache.containsKey(cacheKey)) {
+        print('Using cached Overpass data for $cacheKey');
+        return _cache[cacheKey] as List<SportsFacility>;
+      }
+
+      // 限制请求频率
+      if (_lastRequestTime != null) {
+        final timeSinceLastRequest = DateTime.now()
+            .difference(_lastRequestTime!)
+            .inMilliseconds;
+        if (timeSinceLastRequest < _minRequestInterval) {
+          await Future.delayed(
+            Duration(milliseconds: _minRequestInterval - timeSinceLastRequest),
+          );
+        }
+      }
+
+      _lastRequestTime = DateTime.now();
+
       // 構建 Overpass QL 查詢
       final query = _buildOverpassQuery(latitude, longitude, radiusMeters);
 
@@ -34,11 +65,23 @@ class OverpassService {
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: {'data': query},
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return _parseFacilities(data);
+        final facilities = _parseFacilities(data);
+
+        // 缓存结果（5分钟）
+        _cache[cacheKey] = facilities;
+        Future.delayed(
+          const Duration(minutes: 5),
+          () => _cache.remove(cacheKey),
+        );
+
+        return facilities;
+      } else if (response.statusCode == 429) {
+        print('Overpass API rate limit exceeded, using empty result');
+        return [];
       } else {
         print('Overpass API error: ${response.statusCode}');
         return [];

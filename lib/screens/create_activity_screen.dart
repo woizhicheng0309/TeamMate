@@ -149,22 +149,39 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
       await _databaseService.createActivity(activity);
 
-      // 創建初始群組聊天（只有創建者）
+      // 創建群組聊天，包含創建者
+      // 由於 createActivity 已經自動將創建者加入，需要獲取當前參與者列表
+      final participants = await _databaseService.getActivityParticipants(
+        activity.id,
+      );
+      final participantIds = participants
+          .map((p) => p['user_id'] as String)
+          .toList();
+
       await _chatService.getOrCreateGroupChat(
         activityId: activity.id,
         groupName: activity.title,
-        participantIds: [activity.creatorId],
+        participantIds: participantIds,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('活動建立成功！')));
-
         // Clear form
         _titleController.clear();
         _descriptionController.clear();
         _formKey.currentState!.reset();
+
+        // 重置状态
+        setState(() {
+          _hasSelectedLocation = false;
+          _selectedLocation = null;
+          _address = null;
+          _suitableSports = [];
+          _selectedActivityType = null;
+        });
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('活動建立成功！')));
       }
     } catch (e) {
       if (mounted) {

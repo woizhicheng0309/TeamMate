@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/activity.dart';
+import '../models/join_request.dart';
 import '../services/database_service.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
@@ -23,13 +24,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   bool _isJoining = false;
   bool _hasJoined = false;
+  bool _hasPendingRequest = false;
   List<Map<String, dynamic>> _participants = [];
+  List<JoinRequest> _pendingRequests = [];
 
   @override
   void initState() {
     super.initState();
     _checkIfJoined();
     _loadParticipants();
+    _checkPendingRequest();
+    _loadPendingRequests();
   }
 
   Future<void> _checkIfJoined() async {
@@ -46,6 +51,19 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     });
   }
 
+  Future<void> _checkPendingRequest() async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) return;
+
+    final requests = await _databaseService.getActivityJoinRequests(
+      widget.activity.id,
+      status: 'pending',
+    );
+    setState(() {
+      _hasPendingRequest = requests.any((r) => r.userId == userId);
+    });
+  }
+
   Future<void> _loadParticipants() async {
     final participants = await _databaseService.getActivityParticipants(
       widget.activity.id,
@@ -55,7 +73,88 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     });
   }
 
+  Future<void> _loadPendingRequests() async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null || widget.activity.creatorId != userId) return;
+
+    final requests = await _databaseService.getActivityJoinRequests(
+      widget.activity.id,
+      status: 'pending',
+    );
+    setState(() {
+      _pendingRequests = requests;
+    });
+  }
+
   Future<void> _joinActivity() async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) return;
+
+    setState(() => _isJoining = true);
+
+    try {
+      // 創建加入申請
+      await _databaseService.createJoinRequest(widget.activity.id, userId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('申請已提交，請等待創建者回應')));
+        setState(() {
+          _hasPendingRequest = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('申請失敗: ${e.toString()}')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isJoining = false);
+      }
+    }
+  }
+
+  Future<void> _acceptRequest(JoinRequest request) async {
+    try {
+      await _databaseService.acceptJoinRequest(request.id);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已接受申請')));
+        _loadPendingRequests();
+        _loadParticipants();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('接受失敗: ${e.toString()}')));
+      }
+    }
+  }
+
+  Future<void> _rejectRequest(JoinRequest request) async {
+    try {
+      await _databaseService.rejectJoinRequest(request.id);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已拒絕申請')));
+        _loadPendingRequests();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('拒絕失敗: ${e.toString()}')));
+      }
+    }
+  }
+
+  Future<void> _oldJoinActivity() async {
     final userId = _authService.currentUser?.id;
     if (userId == null) return;
 
@@ -181,6 +280,82 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     }
   }
 
+  Future<void> _deleteActivity() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('確認刪除'),
+        content: const Text('確定要刪除此活動嗎？此操作無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _databaseService.deleteActivity(widget.activity.id);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('活動已刪除')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('刪除失敗: $e')));
+      }
+    }
+  }
+
+  Future<void> _endActivity() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('確認結束活動'),
+        content: const Text('確定要結束此活動嗎？結束後將無法再接受新的申請。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('結束'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _databaseService.endActivity(widget.activity.id);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('活動已結束')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('結束失敗: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCreator = widget.activity.creatorId == _authService.currentUser?.id;
@@ -194,7 +369,45 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         widget.activity.currentParticipants >= widget.activity.maxParticipants;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.activity.title)),
+      appBar: AppBar(
+        title: Text(widget.activity.title),
+        actions: isCreator
+            ? [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'end') {
+                      _endActivity();
+                    } else if (value == 'delete') {
+                      _deleteActivity();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'end',
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('結束活動'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('刪除活動'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ]
+            : null,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -233,6 +446,31 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ),
           ),
 
+          const SizedBox(height: 16),
+
+          // 活動狀態提示
+          if (widget.activity.isEnded)
+            Card(
+              color: Colors.red.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.red.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '此活動已結束，無法接受新的申請',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
 
           // 活動詳情
@@ -362,6 +600,77 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
           const SizedBox(height: 24),
 
+          // 待處理申請（僅創建者可見）
+          if (isCreator && _pendingRequests.isNotEmpty) ...[
+            Card(
+              color: Colors.orange.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.notification_important,
+                          size: 20,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '待處理申請 (${_pendingRequests.length})',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ..._pendingRequests.map(
+                      (request) => Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.person),
+                          ),
+                          title: Text(
+                            request.userFullName ?? request.userEmail ?? '未知用戶',
+                          ),
+                          subtitle: Text(
+                            '申請時間: ${DateFormat('MM/dd HH:mm').format(request.createdAt)}',
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.check,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () => _acceptRequest(request),
+                                tooltip: '接受',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _rejectRequest(request),
+                                tooltip: '拒絕',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // 加入/退出按鈕
           if (!isCreator)
             SizedBox(
@@ -375,13 +684,22 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       ),
                       child: const Text('退出活動'),
                     )
+                  : _hasPendingRequest
+                  ? ElevatedButton(
+                      onPressed: null,
+                      child: const Text('等待審核中...'),
+                    )
                   : ElevatedButton(
-                      onPressed: isFull
+                      onPressed: (isFull || widget.activity.isEnded)
                           ? null
                           : (_isJoining ? null : _joinActivity),
                       child: _isJoining
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(isFull ? '活動已滿' : '加入活動'),
+                          : Text(
+                              widget.activity.isEnded
+                                  ? '活動已結束'
+                                  : (isFull ? '活動已滿' : '申請加入'),
+                            ),
                     ),
             ),
         ],
