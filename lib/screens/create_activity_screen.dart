@@ -24,75 +24,87 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   final _descriptionController = TextEditingController();
   final _maxParticipantsController = TextEditingController(text: '10');
 
-  String _selectedActivityType = 'basketball';
+  // Step 1: Location selection
+  bool _hasSelectedLocation = false;
+  LatLng? _selectedLocation;
+  String? _address;
+  List<String> _suitableSports = [];
+
+  // Step 2: Activity details
+  String? _selectedActivityType;
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
-  String? _address;
-  double? _latitude;
-  double? _longitude;
   bool _isLoading = false;
 
-  final List<Map<String, String>> _activityTypes = [
-    {'key': 'basketball', 'label': '籃球', 'icon': '🏀'},
-    {'key': 'badminton', 'label': '羽毛球', 'icon': '🏸'},
-    {'key': 'running', 'label': '跑步', 'icon': '🏃'},
-    {'key': 'cycling', 'label': '騎車', 'icon': '🚴'},
-    {'key': 'swimming', 'label': '游泳', 'icon': '🏊'},
-    {'key': 'hiking', 'label': '登山', 'icon': '⛰️'},
-    {'key': 'tennis', 'label': '網球', 'icon': '🎾'},
-    {'key': 'football', 'label': '足球', 'icon': '⚽'},
-  ];
+  final Map<String, Map<String, String>> _allSportsInfo = {
+    'basketball': {'label': '籃球', 'icon': '🏀'},
+    'badminton': {'label': '羽毛球', 'icon': '🏸'},
+    'running': {'label': '跑步', 'icon': '🏃'},
+    'cycling': {'label': '騎車', 'icon': '🚴'},
+    'swimming': {'label': '游泳', 'icon': '🏊'},
+    'hiking': {'label': '登山', 'icon': '⛰️'},
+    'tennis': {'label': '網球', 'icon': '🎾'},
+    'football': {'label': '足球', 'icon': '⚽'},
+  };
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    _showLocationPicker();
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      print('Starting to get location...');
-      final position = await _locationService.getCurrentPosition();
-      print('Position: $position');
+  Future<void> _showLocationPicker() async {
+    // 获取当前位置作为初始位置
+    final position = await _locationService.getCurrentPosition();
+    final initialLocation = position != null
+        ? LatLng(position.latitude, position.longitude)
+        : const LatLng(24.179738855398015, 120.64867252111435);
 
-      if (position != null) {
-        final address = await _locationService.getAddressFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-        print('Address: $address');
+    if (!mounted) return;
 
-        if (mounted) {
-          setState(() {
-            _latitude = position.latitude;
-            _longitude = position.longitude;
-            _address = address;
-          });
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LocationPickerScreen(
+          initialLocation: initialLocation,
+          detectFacilities: true,
+          showActivities: true,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _selectedLocation = result['location'] as LatLng;
+        _address = result['address'] as String;
+        _suitableSports = (result['suitableSports'] as List<String>?) ?? [];
+        _hasSelectedLocation = true;
+        
+        // 自动选择第一个适合的运动
+        if (_suitableSports.isNotEmpty) {
+          _selectedActivityType = _suitableSports.first;
         }
-      } else {
-        print('Position is null');
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('無法獲取位置，請檢查權限設定')));
-        }
-      }
-    } catch (e) {
-      print('Error getting location: $e');
+      });
+    } else {
+      // 用户取消了位置选择，返回上一页
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('位置錯誤: $e')));
+        Navigator.pop(context);
       }
     }
   }
 
   Future<void> _createActivity() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_latitude == null || _longitude == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('請允許位置權限')));
+    if (_selectedLocation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('請選擇活動地點')),
+      );
+      return;
+    }
+    if (_selectedActivityType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('請選擇運動類型')),
+      );
       return;
     }
 
@@ -127,10 +139,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         description: _descriptionController.text.isEmpty
             ? null
             : _descriptionController.text,
-        activityType: _selectedActivityType,
+        activityType: _selectedActivityType!,
         eventDate: eventDateTime,
-        latitude: _latitude!,
-        longitude: _longitude!,
+        latitude: _selectedLocation!.latitude,
+        longitude: _selectedLocation!.longitude,
         address: _address,
         maxParticipants: int.parse(_maxParticipantsController.text),
         createdAt: DateTime.now(),
@@ -164,6 +176,74 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasSelectedLocation) {
+      // 显示加载指示器，等待地图选择
+      return Scaffold(
+        appBar: AppBar(title: const Text('建立新活動')),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // 如果没有适合的运动，显示警告
+    if (_suitableSports.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('建立新活動')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 80,
+                  color: Colors.orange,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  '此地點附近沒有適合的運動設施',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _address ?? '未知地點',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: _showLocationPicker,
+                  icon: const Icon(Icons.map),
+                  label: const Text('重新選擇地點'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('取消'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 有适合的运动，显示创建表单
     return Scaffold(
       appBar: AppBar(title: const Text('建立新活動')),
       body: Form(
@@ -171,22 +251,63 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Activity Type Selection
+            // Location Display Card
+            Card(
+              color: Colors.green.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.green),
+                        const SizedBox(width: 8),
+                        const Text(
+                          '活動地點',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _showLocationPicker,
+                          child: const Text('重新選擇'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _address ?? '未知地點',
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Suitable Sports Display
             const Text(
-              '活動類型',
+              '適合的運動類型',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _activityTypes.map((type) {
+              children: _suitableSports.map((sportKey) {
+                final sportInfo = _allSportsInfo[sportKey];
+                if (sportInfo == null) return const SizedBox.shrink();
+                
                 return ChoiceChip(
-                  label: Text('${type['icon']} ${type['label']}'),
-                  selected: _selectedActivityType == type['key'],
+                  label: Text('${sportInfo['icon']} ${sportInfo['label']}'),
+                  selected: _selectedActivityType == sportKey,
                   onSelected: (selected) {
                     if (selected) {
-                      setState(() => _selectedActivityType = type['key']!);
+                      setState(() => _selectedActivityType = sportKey);
                     }
                   },
                 );
@@ -282,92 +403,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
               },
             ),
 
-            const SizedBox(height: 16),
-
-            // Location with Map Picker
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.location_on, color: Colors.blue),
-                    title: const Text('活動地點'),
-                    subtitle: Text(
-                      _address ?? '點擊選擇地點',
-                      style: TextStyle(
-                        color: _address == null ? Colors.grey : Colors.black87,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.map),
-                    onTap: () async {
-                      final result = await Navigator.push<Map<String, dynamic>>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LocationPickerScreen(
-                            initialLocation:
-                                _latitude != null && _longitude != null
-                                ? LatLng(_latitude!, _longitude!)
-                                : null,
-                            detectFacilities: true,
-                            showActivities: true,
-                          ),
-                        ),
-                      );
-
-                      if (result != null) {
-                        final location = result['location'] as LatLng;
-                        final address = result['address'] as String;
-                        final suitableSports =
-                            result['suitableSports'] as List<String>?;
-
-                        setState(() {
-                          _latitude = location.latitude;
-                          _longitude = location.longitude;
-                          _address = address;
-
-                          // 如果檢測到適合的運動，自動選擇第一個
-                          if (suitableSports != null &&
-                              suitableSports.isNotEmpty) {
-                            _selectedActivityType = suitableSports.first;
-                          }
-                        });
-                      }
-                    },
-                  ),
-                  if (_latitude != null && _longitude != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '位置已設定',
-                            style: TextStyle(
-                              color: Colors.green[700],
-                              fontSize: 12,
-                            ),
-                          ),
-                          const Spacer(),
-                          TextButton.icon(
-                            onPressed: _getCurrentLocation,
-                            icon: const Icon(Icons.my_location, size: 16),
-                            label: const Text(
-                              '使用當前位置',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             // Create Button
             ElevatedButton(
