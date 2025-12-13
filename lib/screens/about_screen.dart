@@ -108,19 +108,6 @@ class _AboutScreenState extends State<AboutScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.web),
-                  title: const Text('官方網站'),
-                  subtitle: const Text('https://teammate.com'),
-                  trailing: const Icon(Icons.open_in_new),
-                  onTap: () {
-                    // TODO: Open URL
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('開啟網頁功能開發中')),
-                    );
-                  },
-                ),
-                const Divider(),
-                ListTile(
                   leading: const Icon(Icons.privacy_tip),
                   title: const Text('隱私政策'),
                   trailing: const Icon(Icons.chevron_right),
