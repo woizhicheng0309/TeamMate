@@ -238,6 +238,34 @@ class ChatService {
     try {
       print('🔔 開始發送推送通知...');
 
+      // 根據發送者的隱私設定決定顯示名稱（暱稱或電子郵件）
+      String displaySenderName = senderName;
+      try {
+        final senderProfile = await _supabase
+            .from('users')
+            .select('full_name, email, privacy_show_email')
+            .eq('id', senderId)
+            .maybeSingle();
+
+        if (senderProfile != null) {
+          final allowShowEmail = senderProfile['privacy_show_email'] as bool? ?? true;
+          final fullName = senderProfile['full_name'] as String?;
+          final email = senderProfile['email'] as String?;
+
+          if (!allowShowEmail) {
+            // 關閉電子郵件顯示時，優先顯示暱稱，無暱稱則顯示 email 的前綴
+            displaySenderName = (fullName != null && fullName.isNotEmpty)
+                ? fullName
+                : (email != null ? (email.split('@').first) : senderName);
+          } else {
+            // 開啟電子郵件顯示時，使用 email 前綴（保持簡潔）
+            displaySenderName = (email != null ? (email.split('@').first) : (fullName ?? senderName));
+          }
+        }
+      } catch (e) {
+        print('⚠️ 讀取發送者隱私設定失敗，使用原始名稱: $e');
+      }
+
       // 獲取聊天參與者
       final chatData = await _supabase
           .from('chats')
@@ -279,7 +307,7 @@ class ChatService {
               body: {
                 'userId': participantId,
                 'title': '新消息',
-                'message': '$senderName: $message',
+                'message': '$displaySenderName: $message',
                 'type': 'chat',
                 'data': {'chat_id': chatId, 'sender_id': senderId},
               },

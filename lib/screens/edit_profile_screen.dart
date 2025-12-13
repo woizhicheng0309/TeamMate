@@ -245,6 +245,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // Name Field
             TextFormField(
               controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: '姓名',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return '請輸入姓名';
+                }
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Phone Field
+            TextFormField(
+              controller: _bioController,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: '電話號碼',
@@ -265,20 +283,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 }
                 return null;
               },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Phone Field
-            TextFormField(
-              controller: _bioController,
-              decoration: const InputDecoration(
-                labelText: '電話號碼',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.phone),
-                hintText: '輸入電話號碼（選填）',
-              ),
-              keyboardType: TextInputType.phone,
             ),
 
             const SizedBox(height: 16),
