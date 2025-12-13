@@ -62,8 +62,8 @@ serve(async (req) => {
           body: JSON.stringify({
             app_id: ONESIGNAL_APP_ID,
             include_external_user_ids: [userId],
-            headings: { zh: title },
-            contents: { zh: message },
+            headings: { en: title, zh: title },
+            contents: { en: message, zh: message },
             data: data || {},
             priority: 10,
             isIos: true,
