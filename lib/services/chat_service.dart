@@ -176,7 +176,7 @@ class ChatService {
   }) async {
     try {
       print('🔔 開始發送推送通知...');
-      
+
       // 獲取聊天參與者
       final chatData = await _supabase
           .from('chats')
@@ -194,11 +194,11 @@ class ChatService {
       for (final participantId in participants) {
         if (participantId != senderId) {
           print('📤 向用戶 $participantId 發送通知...');
-          
+
           try {
             // 調用 Supabase Edge Function 發送通知
             final response = await _supabase.functions.invoke(
-              'bright-function',
+              'send-push-notification',
               body: {
                 'userId': participantId,
                 'title': '新消息',
@@ -207,7 +207,7 @@ class ChatService {
                 'data': {'chat_id': chatId, 'sender_id': senderId},
               },
             );
-            
+
             print('✅ 推送通知已發送給用戶: $participantId');
             print('📝 響應: $response');
           } catch (error) {
