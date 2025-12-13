@@ -198,7 +198,7 @@ class ChatService {
           try {
             // 調用 Supabase Edge Function 發送通知
             final response = await _supabase.functions.invoke(
-              'send-push-notification',
+              'bright-function',
               body: {
                 'userId': participantId,
                 'title': '新消息',
