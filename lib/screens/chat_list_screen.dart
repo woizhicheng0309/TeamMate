@@ -84,7 +84,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               final chat = sortedChats[index];
               return Dismissible(
                 key: Key(chat.id),
-                direction: DismissDirection.startToEnd,
+                direction: DismissDirection.horizontal,
                 background: Container(
                   color: Colors.orange,
                   alignment: Alignment.centerLeft,
