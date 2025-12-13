@@ -1,7 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final NotificationService _notificationService = NotificationService();
 
   // Get current user
   User? get currentUser => _supabase.auth.currentUser;
@@ -21,6 +23,11 @@ class AuthService {
         redirectTo: 'io.supabase.teammate://login-callback/',
       );
 
+      // 登入成功後設置 OneSignal 用戶 ID
+      if (response && userId != null) {
+        await _notificationService.setUserId(userId!);
+      }
+
       return response;
     } catch (e) {
       print('Error signing in with Google: $e');
@@ -37,6 +44,11 @@ class AuthService {
         OAuthProvider.google,
       );
 
+      // 登入成功後設置 OneSignal 用戶 ID
+      if (response && userId != null) {
+        await _notificationService.setUserId(userId!);
+      }
+
       return response;
     } catch (e) {
       print('Error signing in with Google: $e');
@@ -47,6 +59,9 @@ class AuthService {
   // Sign Out
   Future<void> signOut() async {
     try {
+      // 登出時清除 OneSignal 用戶 ID
+      await _notificationService.logout();
+      
       await _supabase.auth.signOut();
     } catch (e) {
       print('Error signing out: $e');

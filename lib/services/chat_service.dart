@@ -153,9 +153,65 @@ class ChatService {
             'last_message_time': DateTime.now().toIso8601String(),
           })
           .eq('id', chatId);
+
+      // 發送推送通知給其他參與者
+      _sendPushNotification(
+        chatId: chatId,
+        senderId: senderId,
+        senderName: senderName,
+        message: content,
+      );
     } catch (e) {
       print('Error sending message: $e');
       rethrow;
+    }
+  }
+
+  // 發送推送通知（內部方法）
+  Future<void> _sendPushNotification({
+    required String chatId,
+    required String senderId,
+    required String senderName,
+    required String message,
+  }) async {
+    try {
+      // 獲取聊天參與者
+      final chatData = await _supabase
+          .from('chats')
+          .select('participants')
+          .eq('id', chatId)
+          .single();
+
+      final participants = (chatData['participants'] as List<dynamic>)
+          .map((e) => e.toString())
+          .toList();
+
+      // 給除了發送者之外的所有參與者發送通知
+      for (final participantId in participants) {
+        if (participantId != senderId) {
+          // 調用 Supabase Edge Function 發送通知
+          _supabase.functions.invoke(
+            'send-push-notification',
+            body: {
+              'userId': participantId,
+              'title': '新消息',
+              'message': '$senderName: $message',
+              'type': 'chat',
+              'data': {
+                'chat_id': chatId,
+                'sender_id': senderId,
+              }
+            },
+          ).then((_) {
+            print('✅ 推送通知已發送給用戶: $participantId');
+          }).catchError((error) {
+            print('⚠️ 發送推送通知失敗: $error');
+          });
+        }
+      }
+    } catch (e) {
+      print('⚠️ 發送推送通知錯誤: $e');
+      // 不拋出錯誤，因為消息已經發送成功
     }
   }
 
