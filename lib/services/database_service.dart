@@ -284,6 +284,57 @@ class DatabaseService {
     }
   }
 
+  Future<List<Activity>> getJoinedActivities(String userId) async {
+    try {
+      final response = await _supabase
+          .from('activities')
+          .select('*, participants!inner(user_id)')
+          .filter('participants.user_id', 'eq', userId)
+          .filter('creator_id', 'neq', userId)
+          .order('event_date', ascending: false);
+
+      return (response as List).map((json) => Activity.fromJson(json)).toList();
+    } catch (e) {
+      print('Error getting joined activities: $e');
+      return [];
+    }
+  }
+
+  Stream<List<Activity>> subscribeToJoinedActivities(String userId) {
+    final controller = StreamController<List<Activity>>.broadcast();
+
+    final channel = _supabase
+        .channel('joined_activities_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'participants',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) async {
+            final activities = await getJoinedActivities(userId);
+            controller.add(activities);
+          },
+        )
+        .subscribe();
+
+    // Initial load
+    getJoinedActivities(userId).then((activities) {
+      controller.add(activities);
+    });
+
+    // Cleanup when stream is cancelled
+    controller.onCancel = () {
+      channel.unsubscribe();
+      controller.close();
+    };
+
+    return controller.stream;
+  }
+
   Future<void> deleteActivity(String activityId) async {
     try {
       // 由於有 CASCADE 外鍵，刪除活動會自動刪除相關的參與者、評分、聊天等記錄
