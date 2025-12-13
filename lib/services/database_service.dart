@@ -488,7 +488,8 @@ class DatabaseService {
         await _supabase
             .from('activities')
             .update({
-              'current_participants': (activity['current_participants'] ?? 0) + 1,
+              'current_participants':
+                  (activity['current_participants'] ?? 0) + 1,
             })
             .eq('id', activityId);
 

@@ -593,8 +593,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                             child: Icon(Icons.person),
                           ),
                           title: Text(participant['email'] ?? '參加者'),
-                          trailing:
-                              const Icon(Icons.chat_bubble_outline, size: 20),
+                          trailing: const Icon(
+                            Icons.chat_bubble_outline,
+                            size: 20,
+                          ),
                           onTap: () =>
                               _startPrivateChat(participant['user_id']),
                         ),

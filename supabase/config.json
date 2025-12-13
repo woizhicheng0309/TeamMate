@@ -1,0 +1,15 @@
+{
+  "project": {
+    "projectId": "mnmljxygcvpgkvnshchx",
+    "database": {
+      "tables": []
+    },
+    "functions": [
+      {
+        "slug": "send-push-notification",
+        "importMapPath": null,
+        "verifyJwt": true
+      }
+    ]
+  }
+}
