@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/activity.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../services/auth_service.dart';
+import 'location_picker_screen.dart';
 
 class CreateActivityScreen extends StatefulWidget {
   const CreateActivityScreen({super.key});
@@ -282,16 +284,67 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
             const SizedBox(height: 16),
 
-            // Location
+            // Location with Map Picker
             Card(
-              child: ListTile(
-                leading: const Icon(Icons.location_on),
-                title: const Text('活動地點'),
-                subtitle: Text(_address ?? '獲取位置中...'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _getCurrentLocation,
-                ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.location_on, color: Colors.blue),
+                    title: const Text('活動地點'),
+                    subtitle: Text(
+                      _address ?? '點擊選擇地點',
+                      style: TextStyle(
+                        color: _address == null ? Colors.grey : Colors.black87,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.map),
+                    onTap: () async {
+                      final result = await Navigator.push<Map<String, dynamic>>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LocationPickerScreen(
+                            initialLocation: _latitude != null && _longitude != null
+                                ? LatLng(_latitude!, _longitude!)
+                                : null,
+                          ),
+                        ),
+                      );
+
+                      if (result != null) {
+                        final location = result['location'] as LatLng;
+                        final address = result['address'] as String;
+                        setState(() {
+                          _latitude = location.latitude;
+                          _longitude = location.longitude;
+                          _address = address;
+                        });
+                      }
+                    },
+                  ),
+                  if (_latitude != null && _longitude != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            '位置已設定',
+                            style: TextStyle(
+                              color: Colors.green[700],
+                              fontSize: 12,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: _getCurrentLocation,
+                            icon: const Icon(Icons.my_location, size: 16),
+                            label: const Text('使用當前位置', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
 

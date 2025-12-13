@@ -39,6 +39,12 @@
                 <data android:scheme="io.supabase.teammate" android:host="login-callback" android:pathPrefix="/" />
             </intent-filter>
         </activity>
+        
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyCbIh5wZOTTPFWX1xURjOEX699LpKAU0wQ"/>
+        
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
