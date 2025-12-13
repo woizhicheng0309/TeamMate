@@ -175,6 +175,8 @@ class ChatService {
     required String message,
   }) async {
     try {
+      print('🔔 開始發送推送通知...');
+      
       // 獲取聊天參與者
       final chatData = await _supabase
           .from('chats')
@@ -186,31 +188,38 @@ class ChatService {
           .map((e) => e.toString())
           .toList();
 
+      print('📋 聊天參與者: $participants');
+
       // 給除了發送者之外的所有參與者發送通知
       for (final participantId in participants) {
         if (participantId != senderId) {
-          // 調用 Supabase Edge Function 發送通知
-          _supabase.functions
-              .invoke(
-                'send-push-notification',
-                body: {
-                  'userId': participantId,
-                  'title': '新消息',
-                  'message': '$senderName: $message',
-                  'type': 'chat',
-                  'data': {'chat_id': chatId, 'sender_id': senderId},
-                },
-              )
-              .then((_) {
-                print('✅ 推送通知已發送給用戶: $participantId');
-              })
-              .catchError((error) {
-                print('⚠️ 發送推送通知失敗: $error');
-              });
+          print('📤 向用戶 $participantId 發送通知...');
+          
+          try {
+            // 調用 Supabase Edge Function 發送通知
+            final response = await _supabase.functions.invoke(
+              'send-push-notification',
+              body: {
+                'userId': participantId,
+                'title': '新消息',
+                'message': '$senderName: $message',
+                'type': 'chat',
+                'data': {'chat_id': chatId, 'sender_id': senderId},
+              },
+            );
+            
+            print('✅ 推送通知已發送給用戶: $participantId');
+            print('📝 響應: $response');
+          } catch (error) {
+            print('⚠️ 發送推送通知失敗: $error');
+            print('❌ 錯誤類型: ${error.runtimeType}');
+            // 繼續發送給其他參與者
+          }
         }
       }
     } catch (e) {
       print('⚠️ 發送推送通知錯誤: $e');
+      print('❌ 錯誤類型: ${e.runtimeType}');
       // 不拋出錯誤，因為消息已經發送成功
     }
   }
