@@ -559,7 +559,7 @@ class DatabaseService {
             .from('chats')
             .select()
             .eq('activity_id', activityId)
-            .eq('is_group', true)
+            .eq('type', 'group')
             .maybeSingle();
 
         if (groupChat != null) {
