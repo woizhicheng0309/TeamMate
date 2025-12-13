@@ -11,8 +11,8 @@ class ChatService {
         .from('chats')
         .stream(primaryKey: ['id'])
         .order('last_message_time', ascending: true)
-        .map((data) {
-          return data
+        .map((data) async {
+          final filteredChats = data
               .where(
                 (chatData) =>
                     (chatData['participants'] as List<dynamic>?)?.contains(
@@ -20,9 +20,67 @@ class ChatService {
                     ) ??
                     false,
               )
-              .map((chatData) => Chat.fromJson(chatData))
               .toList();
-        });
+
+          // 对于私聊，动态获取对方的名字
+          final chats = <Chat>[];
+          for (final chatData in filteredChats) {
+            final chat = Chat.fromJson(chatData);
+            
+            // 如果是私聊，获取对方的名字
+            if (chat.type == 'private') {
+              try {
+                // 找出对方的 ID（不是当前用户的）
+                final participants = chatData['participants'] as List<dynamic>;
+                final otherUserId = participants
+                    .firstWhere((p) => p.toString() != userId,
+                        orElse: () => null);
+
+                if (otherUserId != null) {
+                  // 获取对方的名字
+                  final otherUserResponse = await _supabase
+                      .from('users')
+                      .select('full_name, email')
+                      .eq('id', otherUserId.toString())
+                      .maybeSingle();
+
+                  if (otherUserResponse != null) {
+                    final otherUserName =
+                        (otherUserResponse['full_name'] as String?) ??
+                        (otherUserResponse['email'] as String).split('@')[0];
+                    
+                    // 更新聊天名称为对方的名字
+                    chats.add(Chat(
+                      id: chat.id,
+                      type: chat.type,
+                      activityId: chat.activityId,
+                      name: otherUserName,
+                      avatarUrl: chat.avatarUrl,
+                      participants: chat.participants,
+                      lastMessage: chat.lastMessage,
+                      lastMessageTime: chat.lastMessageTime,
+                      unreadCount: chat.unreadCount,
+                      createdAt: chat.createdAt,
+                      isPinned: chat.isPinned,
+                    ));
+                  } else {
+                    chats.add(chat);
+                  }
+                } else {
+                  chats.add(chat);
+                }
+              } catch (e) {
+                print('Error getting other user info: $e');
+                chats.add(chat);
+              }
+            } else {
+              chats.add(chat);
+            }
+          }
+          
+          return chats;
+        }).asyncExpand((futureChats) =>
+            Stream.fromFuture(futureChats));
   }
 
   // Get or create a chat between two users
