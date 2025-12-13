@@ -33,6 +33,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   List<Map<String, dynamic>> _participants = [];
   List<JoinRequest> _pendingRequests = [];
   late Timer _checkInWindowTimer;
+  Activity? _updatedActivity;
 
   @override
   void initState() {
@@ -42,19 +43,32 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     _checkPendingRequest();
     _loadPendingRequests();
     
-    // 添加定时器在打卡窗口期间每秒刷新 UI
+    // 添加定时器在打卡窗口期间每秒刷新 UI 并重新加载活动数据
     _checkInWindowTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       final now = DateTime.now();
       final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
       final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
       
-      // 如果在打卡窗口内，就刷新 UI
-      if (now.isAfter(checkInStart) && now.isBefore(checkInEnd)) {
+      // 如果在打卡窗口内或附近，就重新加载活动数据并刷新 UI
+      if (now.isAfter(checkInStart.subtract(const Duration(minutes: 1))) && 
+          now.isBefore(checkInEnd.add(const Duration(minutes: 1)))) {
+        _refreshActivityData();
         if (mounted) {
           setState(() {});
         }
       }
     });
+  }
+
+  Future<void> _refreshActivityData() async {
+    try {
+      final updatedActivity = await _databaseService.getActivityById(widget.activity.id);
+      if (updatedActivity != null && mounted) {
+        _updatedActivity = updatedActivity;
+      }
+    } catch (e) {
+      print('Error refreshing activity data: $e');
+    }
   }
 
   @override
@@ -396,21 +410,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
     // 調試打卡窗口
     final now = DateTime.now();
-    final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
-    final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
+    final checkInStart = activity.eventDate.subtract(const Duration(minutes: 5));
+    final checkInEnd = activity.eventDate.add(const Duration(minutes: 5));
     final inCheckInWindow = now.isAfter(checkInStart) && now.isBefore(checkInEnd);
     
     print('🔍 打卡調試:');
     print('  當前時間: $now');
-    print('  活動時間: ${widget.activity.eventDate}');
+    print('  活動時間: ${activity.eventDate}');
     print('  打卡窗口: $checkInStart ~ $checkInEnd');
     print('  在窗口內: $inCheckInWindow');
     print('  是創建者: $isCreator');
-    print('  已打卡: ${widget.activity.creatorCheckedIn}');
+    print('  已打卡: ${activity.creatorCheckedIn}');
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.activity.title),
+        title: Text(activity.title),
         actions: isCreator
             ? [
                 PopupMenuButton<String>(
@@ -514,7 +528,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           const SizedBox(height: 16),
 
           // 打卡狀態顯示
-          if (widget.activity.creatorCheckedIn ?? false)
+          if (activity.creatorCheckedIn ?? false)
             Card(
               color: Colors.green.shade50,
               child: Padding(
@@ -552,26 +566,26 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     DateFormat(
                       'yyyy/MM/dd HH:mm',
                       'zh_TW',
-                    ).format(widget.activity.eventDate),
+                    ).format(activity.eventDate),
                   ),
                   const Divider(),
                   _buildInfoRow(
                     Icons.location_on,
                     '地點',
-                    widget.activity.address ?? '未提供地址',
+                    activity.address ?? '未提供地址',
                   ),
                   const Divider(),
                   _buildInfoRow(
                     Icons.people,
                     '參加人數',
-                    '${widget.activity.currentParticipants}/${widget.activity.maxParticipants} 人',
+                    '${activity.currentParticipants}/${activity.maxParticipants} 人',
                   ),
-                  if (widget.activity.duration != null) ...[
+                  if (activity.duration != null) ...[
                     const Divider(),
                     _buildInfoRow(
                       Icons.timer,
                       '預計時長',
-                      '${widget.activity.duration} 分鐘',
+                      '${activity.duration} 分鐘',
                     ),
                   ],
                 ],
@@ -579,7 +593,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ),
           ),
 
-          if (widget.activity.description != null) ...[
+          if (activity.description != null) ...[
             const SizedBox(height: 16),
             Card(
               child: Padding(
@@ -748,12 +762,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           // 打卡按鈕（創建者）
           if (isCreator &&
               DateTime.now().isAfter(
-                widget.activity.eventDate.subtract(const Duration(minutes: 5)),
+                activity.eventDate.subtract(const Duration(minutes: 5)),
               ) &&
               DateTime.now().isBefore(
-                widget.activity.eventDate.add(const Duration(minutes: 5)),
+                activity.eventDate.add(const Duration(minutes: 5)),
               ) &&
-              !(widget.activity.creatorCheckedIn ?? false))
+              !(activity.creatorCheckedIn ?? false))
             SizedBox(
               height: 50,
               child: ElevatedButton.icon(
@@ -762,7 +776,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          CreatorCheckInScreen(activity: widget.activity),
+                          CreatorCheckInScreen(activity: activity),
                     ),
                   );
                 },
@@ -778,12 +792,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           // 打卡確認按鈕（參與者）
           if (!isCreator &&
               _hasJoined &&
-              (widget.activity.creatorCheckedIn ?? false) &&
+              (activity.creatorCheckedIn ?? false) &&
               DateTime.now().isAfter(
-                widget.activity.eventDate.subtract(const Duration(minutes: 5)),
+                activity.eventDate.subtract(const Duration(minutes: 5)),
               ) &&
               DateTime.now().isBefore(
-                widget.activity.eventDate.add(const Duration(minutes: 5)),
+                activity.eventDate.add(const Duration(minutes: 5)),
               ))
             SizedBox(
               height: 50,
