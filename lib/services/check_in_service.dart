@@ -79,7 +79,7 @@ class CheckInService {
         'creator_checked_in': true,
         'creator_check_in_time': DateTime.now().toIso8601String(),
         'creator_check_in_location':
-            'POINT(${position.latitude} ${position.longitude})',
+            '(${position.longitude},${position.latitude})',  // PostgreSQL point format: (longitude, latitude)
       }).eq('id', activityId);
 
       print('✅ 創建者打卡成功，密碼: $checkInCode');
@@ -150,7 +150,7 @@ class CheckInService {
         'user_id': userId,
         'checked_in': true,
         'check_in_time': DateTime.now().toIso8601String(),
-        'check_in_location': 'POINT(${position.latitude} ${position.longitude})',
+        'check_in_location': '(${position.longitude},${position.latitude})',  // PostgreSQL point format: (longitude, latitude)
       });
 
       print('✅ 參與者打卡成功');
