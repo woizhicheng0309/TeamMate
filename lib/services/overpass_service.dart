@@ -27,12 +27,14 @@ class OverpassService {
     try {
       // 構建 Overpass QL 查詢
       final query = _buildOverpassQuery(latitude, longitude, radiusMeters);
-      
-      final response = await http.post(
-        Uri.parse(_overpassUrl),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {'data': query},
-      ).timeout(const Duration(seconds: 10));
+
+      final response = await http
+          .post(
+            Uri.parse(_overpassUrl),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: {'data': query},
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -72,10 +74,9 @@ class OverpassService {
     }
 
     // 返回有設施的運動類型，按數量排序
-    final suitableSports = sportCounts.entries
-        .where((e) => e.value > 0)
-        .toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final suitableSports =
+        sportCounts.entries.where((e) => e.value > 0).toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
 
     return suitableSports.map((e) => e.key).toList();
   }

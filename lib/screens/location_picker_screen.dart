@@ -28,10 +28,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   LatLng _selectedLocation = const LatLng(24.1797, 120.6486); // 台中預設
   String _selectedAddress = '載入中...';
   bool _isLoading = false;
-  
+
   final OverpassService _overpassService = OverpassService();
   final DatabaseService _databaseService = DatabaseService();
-  
+
   List<SportsFacility> _facilities = [];
   List<Activity> _nearbyActivities = [];
   Set<Marker> _markers = {};
@@ -64,7 +64,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   Future<void> _getCurrentLocation() async {
     try {
       setState(() => _isLoading = true);
-      
+
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         await Geolocator.requestPermission();
@@ -78,11 +78,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
       final newLocation = LatLng(position.latitude, position.longitude);
       setState(() => _selectedLocation = newLocation);
-      
+
       _mapController?.animateCamera(
         CameraUpdate.newLatLngZoom(newLocation, 15),
       );
-      
+
       await _updateAddress(newLocation);
     } catch (e) {
       print('Error getting current location: $e');
@@ -124,7 +124,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _selectedAddress = '載入中...';
     });
     _updateAddress(location);
-    
+
     // 延遲載入設施以避免過度查詢
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
@@ -215,8 +215,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             BitmapDescriptor.hueOrange,
           ),
           infoWindow: InfoWindow(
-            title: '${OverpassService.getSportEmoji(activity.activityType)} ${activity.title}',
-            snippet: '${activity.currentParticipants}/${activity.maxParticipants} 人',
+            title:
+                '${OverpassService.getSportEmoji(activity.activityType)} ${activity.title}',
+            snippet:
+                '${activity.currentParticipants}/${activity.maxParticipants} 人',
           ),
         ),
       );
@@ -310,8 +312,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.check_circle,
-                                    color: Colors.green),
+                                Icon(Icons.check_circle, color: Colors.green),
                                 SizedBox(width: 8),
                                 Text(
                                   '此處適合的運動',
@@ -373,12 +374,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                     const SizedBox(height: 8),
                     Text(
                       _selectedAddress,
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
                     ),
-                    if (widget.showActivities && _nearbyActivities.isNotEmpty) ...[
+                    if (widget.showActivities &&
+                        _nearbyActivities.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       const Divider(),
                       Text(

@@ -303,7 +303,8 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => LocationPickerScreen(
-                            initialLocation: _latitude != null && _longitude != null
+                            initialLocation:
+                                _latitude != null && _longitude != null
                                 ? LatLng(_latitude!, _longitude!)
                                 : null,
                             detectFacilities: true,
@@ -315,15 +316,17 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                       if (result != null) {
                         final location = result['location'] as LatLng;
                         final address = result['address'] as String;
-                        final suitableSports = result['suitableSports'] as List<String>?;
-                        
+                        final suitableSports =
+                            result['suitableSports'] as List<String>?;
+
                         setState(() {
                           _latitude = location.latitude;
                           _longitude = location.longitude;
                           _address = address;
-                          
+
                           // 如果檢測到適合的運動，自動選擇第一個
-                          if (suitableSports != null && suitableSports.isNotEmpty) {
+                          if (suitableSports != null &&
+                              suitableSports.isNotEmpty) {
                             _selectedActivityType = suitableSports.first;
                           }
                         });
@@ -335,7 +338,11 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                       child: Row(
                         children: [
-                          Icon(Icons.check_circle, color: Colors.green, size: 16),
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 16,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '位置已設定',
@@ -348,7 +355,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                           TextButton.icon(
                             onPressed: _getCurrentLocation,
                             icon: const Icon(Icons.my_location, size: 16),
-                            label: const Text('使用當前位置', style: TextStyle(fontSize: 12)),
+                            label: const Text(
+                              '使用當前位置',
+                              style: TextStyle(fontSize: 12),
+                            ),
                           ),
                         ],
                       ),
