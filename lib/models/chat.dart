@@ -32,7 +32,8 @@ class Chat {
       activityId: json['activity_id'] as String?,
       name: json['name'] as String,
       avatarUrl: json['avatar_url'] as String?,
-      participants: (json['participants'] as List<dynamic>?)
+      participants:
+          (json['participants'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],

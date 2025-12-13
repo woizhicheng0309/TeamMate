@@ -258,9 +258,10 @@ class ChatService {
   // Update chat pinned status
   Future<void> updateChatPinned(String chatId, bool isPinned) async {
     try {
-      await _supabase.from('chats').update({
-        'is_pinned': isPinned,
-      }).eq('id', chatId);
+      await _supabase
+          .from('chats')
+          .update({'is_pinned': isPinned})
+          .eq('id', chatId);
     } catch (e) {
       print('Error updating chat pinned status: $e');
       rethrow;

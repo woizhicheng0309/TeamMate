@@ -47,6 +47,7 @@ class NotificationService {
   /// 設置用戶 ID（登入時調用）
   Future<void> setUserId(String userId) async {
     try {
+      // 使用 setExternalUserId 以便 Edge Function 能正確發送通知
       await OneSignal.login(userId);
       print('✅ OneSignal 用戶 ID 已設置: $userId');
     } catch (e) {
@@ -107,23 +108,23 @@ class NotificationService {
   /// 處理通知點擊
   void _handleNotificationOpened(OSNotificationClickEvent event) {
     final data = event.notification.additionalData;
-    
+
     if (data != null && data.containsKey('type')) {
       final type = data['type'];
-      
+
       switch (type) {
         case 'chat':
           final chatId = data['chat_id'];
           print('🔔 打開聊天: $chatId');
           // 這裡可以添加導航邏輯
           break;
-          
+
         case 'activity':
           final activityId = data['activity_id'];
           print('🔔 打開活動: $activityId');
           // 這裡可以添加導航邏輯
           break;
-          
+
         default:
           print('🔔 未知通知類型: $type');
       }

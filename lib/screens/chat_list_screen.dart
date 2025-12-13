@@ -20,16 +20,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final userId = _authService.userId;
 
     if (userId == null) {
-      return const Scaffold(
-        body: Center(child: Text('請先登入')),
-      );
+      return const Scaffold(body: Center(child: Text('請先登入')));
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('聊天'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('聊天'), elevation: 0),
       body: StreamBuilder<List<Chat>>(
         stream: _chatService.getUserChats(userId),
         builder: (context, snapshot) {
@@ -48,23 +43,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.chat_bubble_outline,
-                      size: 64, color: Colors.grey[400]),
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     '還沒有聊天記錄',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '加入活動或私信其他用戶開始聊天',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[500],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                   ),
                 ],
               ),
@@ -73,8 +65,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
           // 分离置顶和未置顶的聊天
           final pinnedChats = chats.where((c) => c.isPinned ?? false).toList();
-          final unpinnedChats = chats.where((c) => !(c.isPinned ?? false)).toList();
-          
+          final unpinnedChats = chats
+              .where((c) => !(c.isPinned ?? false))
+              .toList();
+
           // 合并：置顶在前
           final sortedChats = [...pinnedChats, ...unpinnedChats];
 
@@ -93,7 +87,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        chat.isPinned ?? false ? Icons.push_pin_outlined : Icons.push_pin,
+                        chat.isPinned ?? false
+                            ? Icons.push_pin_outlined
+                            : Icons.push_pin,
                         color: Colors.white,
                       ),
                       const SizedBox(width: 8),
@@ -197,8 +193,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: chat.unreadCount > 0 ? Colors.black87 : Colors.grey,
-          fontWeight:
-              chat.unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+          fontWeight: chat.unreadCount > 0
+              ? FontWeight.w500
+              : FontWeight.normal,
         ),
       ),
       trailing: Column(
@@ -235,9 +232,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => ChatRoomScreen(chat: chat),
-          ),
+          MaterialPageRoute(builder: (context) => ChatRoomScreen(chat: chat)),
         );
       },
     );
@@ -261,7 +256,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void _togglePinChat(Chat chat) {
     final newPinnedState = !(chat.isPinned ?? false);
     _chatService.updateChatPinned(chat.id, newPinnedState);
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(newPinnedState ? '聊天已置頂' : '聊天已取消置頂'),
@@ -272,12 +267,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   void _deleteChat(Chat chat) {
     _chatService.deleteChat(chat.id);
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('聊天已刪除'),
-        duration: Duration(seconds: 2),
-      ),
+      const SnackBar(content: Text('聊天已刪除'), duration: Duration(seconds: 2)),
     );
   }
 }
