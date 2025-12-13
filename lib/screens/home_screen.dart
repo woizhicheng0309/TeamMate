@@ -3,6 +3,7 @@ import 'nearby_activities_screen.dart';
 import 'create_activity_screen.dart';
 import 'my_activities_screen.dart';
 import 'profile_screen.dart';
+import 'chat_list_screen.dart';
 import '../services/location_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,24 +21,35 @@ class _HomeScreenState extends State<HomeScreen> {
     const NearbyActivitiesScreen(),
     const CreateActivityScreen(),
     const MyActivitiesScreen(),
+    const ChatListScreen(),
     const ProfileScreen(),
   ];
 
   @override
   void initState() {
     super.initState();
-    _requestLocationPermission();
+    // 延遲請求權限避免阻塞啟動
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _requestLocationPermission();
+      }
+    });
   }
 
   Future<void> _requestLocationPermission() async {
-    final hasPermission = await _locationService.checkPermissions();
-    if (!hasPermission && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('請允許位置權限以使用附近活動功能'),
-          duration: Duration(seconds: 3),
-        ),
-      );
+    try {
+      final hasPermission = await _locationService.checkPermissions()
+          .timeout(const Duration(seconds: 3));
+      if (!hasPermission && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('請允許位置權限以使用附近活動功能'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Permission request error: $e');
     }
   }
 
@@ -49,14 +61,17 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
+        selectedFontSize: 12,
+        unselectedFontSize: 11,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.explore), label: '搜尋活動'),
+          BottomNavigationBarItem(icon: Icon(Icons.explore), label: '搜尋'),
           BottomNavigationBarItem(
             icon: Icon(Icons.add_circle_outline),
-            label: '建立活動',
+            label: '建立',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.event), label: '我的活動'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: '個人資料'),
+          BottomNavigationBarItem(icon: Icon(Icons.event), label: '活動'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: '聊天'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: '我的'),
         ],
       ),
     );
