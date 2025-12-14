@@ -2,7 +2,7 @@ class Chat {
   final String id;
   final String type; // 'private' or 'group'
   final String? activityId; // For group chats
-  final String name;
+  final String? name;  // Nullable for private chats (dynamically computed)
   final String? avatarUrl;
   final List<String> participants;
   final String? lastMessage;
@@ -15,7 +15,7 @@ class Chat {
     required this.id,
     required this.type,
     this.activityId,
-    required this.name,
+    this.name,
     this.avatarUrl,
     required this.participants,
     this.lastMessage,
@@ -30,7 +30,7 @@ class Chat {
       id: json['id'] as String,
       type: json['type'] as String,
       activityId: json['activity_id'] as String?,
-      name: json['name'] as String,
+      name: json['name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       participants:
           (json['participants'] as List<dynamic>?)

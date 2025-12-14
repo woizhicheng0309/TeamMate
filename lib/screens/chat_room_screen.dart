@@ -82,17 +82,66 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget build(BuildContext context) {
     final userId = _authService.userId;
 
+    // For private chats, get other user's info
+    String chatTitle = widget.chat.name ?? '聊天';
+    String? chatAvatar = widget.chat.avatarUrl;
+    
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
           children: [
-            Text(widget.chat.name),
-            if (widget.chat.type == 'group')
-              Text(
-                '${widget.chat.participants.length} 位成員',
-                style: const TextStyle(fontSize: 12),
+            GestureDetector(
+              onTap: widget.chat.type == 'private' ? () async {
+                // 獲取對方 ID
+                final otherUserId = widget.chat.participants.firstWhere(
+                  (id) => id != _authService.userId,
+                  orElse: () => '',
+                );
+                if (otherUserId.isNotEmpty) {
+                  final profile = await _db.getUserProfile(otherUserId);
+                  if (!mounted) return;
+                  _showUserInfoSheet(context, profile, otherUserId);
+                }
+              } : null,
+              child: chatAvatar != null && chatAvatar.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundImage: NetworkImage(chatAvatar),
+                      onBackgroundImageError: (_, __) {},
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: widget.chat.type == 'group' ? Colors.blue : Colors.green,
+                      child: Icon(
+                        widget.chat.type == 'group' ? Icons.group : Icons.person,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(chatTitle, style: const TextStyle(fontSize: 16)),
+                  if (widget.chat.type == 'group')
+                    Text(
+                      '${widget.chat.participants.length} 位成員',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
         elevation: 0,
@@ -133,9 +182,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   );
                 }
 
-                // 滾動到最新消息
+                // 首次加載或有新消息時滾動到底部
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
+                  if (_scrollController.hasClients && messages.isNotEmpty) {
                     _scrollController.jumpTo(
                       _scrollController.position.maxScrollExtent,
                     );
@@ -185,15 +234,27 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Widget _buildMessage(Message message, bool isMe) {
-    final String? cachedAvatar = _avatarCache[message.senderId];
-    final String? effectiveAvatar = message.senderAvatar ?? cachedAvatar;
+    // For private chats, use the chat's avatar (other user's avatar)
+    // For group chats, use the sender's avatar from the message
+    final String? effectiveAvatar = widget.chat.type == 'private' 
+        ? widget.chat.avatarUrl 
+        : (message.senderAvatar ?? _avatarCache[message.senderId]);
+    
+    // 獲取當前用戶的頭像
+    String? myAvatar;
+    if (isMe && _authService.currentUser != null) {
+      final metadata = _authService.currentUser!.userMetadata;
+      if (metadata != null) {
+        myAvatar = metadata['avatar_url'] as String?;
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment:
             isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
             GestureDetector(
@@ -204,26 +265,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               },
               child: CircleAvatar(
                 radius: 16,
+                backgroundImage: effectiveAvatar != null && effectiveAvatar.isNotEmpty
+                    ? NetworkImage(effectiveAvatar)
+                    : null,
                 backgroundColor: Colors.blue,
-                child: effectiveAvatar != null
-                    ? ClipOval(
-                        child: Image.network(
-                          effectiveAvatar,
-                          width: 32,
-                          height: 32,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      )
-                    : const Icon(
+                onBackgroundImageError: effectiveAvatar != null ? (_, __) {} : null,
+                child: effectiveAvatar == null || effectiveAvatar.isEmpty
+                    ? const Icon(
                         Icons.person,
                         color: Colors.white,
                         size: 18,
-                      ),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(width: 8),
@@ -274,6 +327,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ],
             ),
           ),
+          if (isMe) ...[
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 16,
+              backgroundImage: myAvatar != null && myAvatar.isNotEmpty
+                  ? NetworkImage(myAvatar)
+                  : null,
+              backgroundColor: Colors.grey[300],
+              child: myAvatar == null || myAvatar.isEmpty
+                  ? const Icon(
+                      Icons.person,
+                      size: 18,
+                    )
+                  : null,
+            ),
+          ],
         ],
       ),
     );
@@ -290,6 +359,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     } catch (_) {}
   }
 
+  Future<bool> _checkFriendship(String userId) async {
+    final currentUserId = _authService.userId;
+    if (currentUserId == null) return false;
+
+    try {
+      // TODO: 實現真正的好友關係查詢
+      // 這裡應該查詢 friends 表，檢查是否存在好友關係
+      // 目前先返回 false，表示都不是好友
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   void _showUserInfoSheet(BuildContext context, UserProfile? profile, String userId) {
     showModalBottomSheet(
       context: context,
@@ -297,61 +380,117 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        return FutureBuilder<bool>(
+          future: _checkFriendship(userId),
+          builder: (context, snapshot) {
+            final isFriend = snapshot.data ?? false;
+            
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage: (profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty)
-                        ? NetworkImage(profile.photoUrl!)
-                        : null,
-                    child: (profile?.photoUrl == null || (profile?.photoUrl?.isEmpty ?? true))
-                        ? const Icon(Icons.person, color: Colors.white)
-                        : null,
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundImage: profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty
+                            ? NetworkImage(profile.photoUrl!)
+                            : null,
+                        backgroundColor: Colors.blue,
+                        child: profile?.photoUrl == null || profile!.photoUrl!.isEmpty
+                            ? const Icon(Icons.person, size: 32, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile?.displayName ?? '用戶',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              profile?.email ?? '',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(profile?.displayName ?? '未知用戶', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        if (profile?.email != null)
-                          Text(profile!.email!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
+                  const SizedBox(height: 24),
+                  if (profile?.interests != null && profile!.interests!.isNotEmpty) ...[
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '運動偏好',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已送出好友邀請'), duration: Duration(seconds: 2)),
-                      );
-                      // TODO: 接入真正的好友申請 API
-                    },
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('加好友'),
-                  ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: profile.interests!
+                          .map((interest) => Chip(
+                                label: Text(interest),
+                                backgroundColor: Colors.blue[50],
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  // 根據好友關係顯示不同按鈕
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const CircularProgressIndicator()
+                  else if (isFriend)
+                    // 已經是好友，顯示刪除好友按鈕
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        // TODO: 實現刪除好友功能
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('刪除好友功能尚未實現')),
+                        );
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.person_remove),
+                      label: const Text('刪除好友'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    )
+                  else
+                    // 還不是好友，顯示加好友按鈕
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: 實現加好友功能
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('加好友功能尚未實現')),
+                        );
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('加好友'),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Text('運動偏好', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: (profile?.interests ?? const <String>[])
-                    .map((s) => Chip(label: Text(s)))
-                    .toList(),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ),
+            );
+          },
         );
       },
     );

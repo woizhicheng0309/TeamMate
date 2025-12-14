@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/chat.dart';
+import '../models/user_profile.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
+import '../services/database_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
@@ -15,6 +17,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
+  final DatabaseService _db = DatabaseService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -74,9 +77,67 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chatTitle = widget.chat.name ?? '聊天';
+    final chatAvatar = widget.chat.avatarUrl;
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.chat.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            GestureDetector(
+              onTap: widget.chat.type == 'private' ? () async {
+                // 獲取對方 ID
+                final otherUserId = widget.chat.participants.firstWhere(
+                  (id) => id != _authService.currentUser?.id,
+                  orElse: () => '',
+                );
+                if (otherUserId.isNotEmpty) {
+                  final profile = await _db.getUserProfile(otherUserId);
+                  if (!mounted) return;
+                  _showUserInfoSheet(context, profile, otherUserId);
+                }
+              } : null,
+              child: chatAvatar != null && chatAvatar.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundImage: NetworkImage(chatAvatar),
+                      onBackgroundImageError: (_, __) {},
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: widget.chat.type == 'group' ? Colors.blue : Colors.green,
+                      child: Icon(
+                        widget.chat.type == 'group' ? Icons.group : Icons.person,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(chatTitle, style: const TextStyle(fontSize: 16)),
+                  if (widget.chat.type == 'group')
+                    Text(
+                      '${widget.chat.participants.length} 位成員',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           if (widget.chat.type == 'group')
             IconButton(
@@ -91,6 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
         ],
+        elevation: 0,
       ),
       body: Column(
         children: [
@@ -133,13 +195,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
 
-                // 在消息加载完成后立即滚动到底部
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
+                // 首次加載或有新消息時滾動到底部
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients && messages.isNotEmpty) {
+                    _scrollController.jumpTo(
                       _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
                     );
                   }
                 });
@@ -216,6 +276,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(Message message, bool isMe) {
+    // For private chats, use the chat's avatar (other user's avatar)
+    // For group chats, use the sender's avatar from the message
+    final String? effectiveAvatar = widget.chat.type == 'private' 
+        ? widget.chat.avatarUrl 
+        : message.senderAvatar;
+    
+    // 獲取當前用戶的頭像
+    String? myAvatar;
+    if (isMe && _authService.currentUser != null) {
+      final metadata = _authService.currentUser!.userMetadata;
+      if (metadata != null) {
+        myAvatar = metadata['avatar_url'] as String?;
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -225,12 +300,25 @@ class _ChatScreenState extends State<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.grey[300],
-              child: Text(
-                message.senderName[0].toUpperCase(),
-                style: const TextStyle(fontSize: 14),
+            GestureDetector(
+              onTap: () async {
+                final profile = await _db.getUserProfile(message.senderId);
+                if (!mounted) return;
+                _showUserInfoSheet(context, profile, message.senderId);
+              },
+              child: CircleAvatar(
+                radius: 16,
+                backgroundImage: effectiveAvatar != null && effectiveAvatar.isNotEmpty
+                    ? NetworkImage(effectiveAvatar)
+                    : null,
+                backgroundColor: Colors.grey[300],
+                onBackgroundImageError: effectiveAvatar != null ? (_, __) {} : null,
+                child: effectiveAvatar == null || effectiveAvatar.isEmpty
+                    ? Text(
+                        message.senderName[0].toUpperCase(),
+                        style: const TextStyle(fontSize: 14),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(width: 8),
@@ -282,7 +370,22 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-          if (isMe) const SizedBox(width: 40),
+          if (isMe) ...[
+            const SizedBox(width: 8),
+            CircleAvatar(
+              radius: 16,
+              backgroundImage: myAvatar != null && myAvatar.isNotEmpty
+                  ? NetworkImage(myAvatar)
+                  : null,
+              backgroundColor: Colors.grey[300],
+              child: myAvatar == null || myAvatar.isEmpty
+                  ? Text(
+                      message.senderName[0].toUpperCase(),
+                      style: const TextStyle(fontSize: 14),
+                    )
+                  : null,
+            ),
+          ],
           if (!isMe) const SizedBox(width: 40),
         ],
       ),
@@ -302,5 +405,142 @@ class _ChatScreenState extends State<ChatScreen> {
     } else {
       return '${time.month}/${time.day}';
     }
+  }
+
+  Future<bool> _checkFriendship(String userId) async {
+    final currentUserId = _authService.currentUser?.id;
+    if (currentUserId == null) return false;
+
+    try {
+      // TODO: 實現真正的好友關係查詢
+      // 這裡應該查詢 friends 表，檢查是否存在好友關係
+      // 目前先返回 false，表示都不是好友
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _showUserInfoSheet(BuildContext context, UserProfile? profile, String userId) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return FutureBuilder<bool>(
+          future: _checkFriendship(userId),
+          builder: (context, snapshot) {
+            final isFriend = snapshot.data ?? false;
+            
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundImage: profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty
+                            ? NetworkImage(profile.photoUrl!)
+                            : null,
+                        backgroundColor: Colors.blue,
+                        child: profile?.photoUrl == null || profile!.photoUrl!.isEmpty
+                            ? const Icon(Icons.person, size: 32, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile?.displayName ?? '用戶',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              profile?.email ?? '',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  if (profile?.interests != null && profile!.interests!.isNotEmpty) ...[
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '運動偏好',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: profile.interests!
+                          .map((interest) => Chip(
+                                label: Text(interest),
+                                backgroundColor: Colors.blue[50],
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  // 根據好友關係顯示不同按鈕
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const CircularProgressIndicator()
+                  else if (isFriend)
+                    // 已經是好友，顯示刪除好友按鈕
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        // TODO: 實現刪除好友功能
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('刪除好友功能尚未實現')),
+                        );
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.person_remove),
+                      label: const Text('刪除好友'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    )
+                  else
+                    // 還不是好友，顯示加好友按鈕
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: 實現加好友功能
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('加好友功能尚未實現')),
+                        );
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('加好友'),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

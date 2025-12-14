@@ -180,7 +180,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         children: [
           Expanded(
             child: Text(
-              chat.name,
+              chat.name ?? '聊天',
               style: const TextStyle(fontWeight: FontWeight.bold),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

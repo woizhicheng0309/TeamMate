@@ -89,17 +89,6 @@ class ChatService {
   // Get or create a chat between two users
   Future<Chat> getOrCreateChat(String user1Id, String user2Id) async {
     try {
-      // Get user names for the chat
-      final user1Response = await _supabase
-          .from('users')
-          .select('full_name, email')
-          .eq('id', user2Id)
-          .single();
-
-      final user2Name =
-          (user1Response['full_name'] as String?) ??
-          (user1Response['email'] as String).split('@')[0];
-
       // Check if chat already exists
       final response = await _supabase
           .from('chats')
@@ -109,16 +98,35 @@ class ChatService {
           .maybeSingle();
 
       if (response != null) {
-        return Chat.fromJson(response);
+        // Get other user's info for display
+        final otherUserId = (response['participants'] as List)
+            .firstWhere((id) => id != user1Id);
+        final userResponse = await _supabase
+            .from('users')
+            .select('full_name, email, avatar_url')
+            .eq('id', otherUserId)
+            .single();
+
+        final otherUserName =
+            (userResponse['full_name'] as String?) ??
+            (userResponse['email'] as String).split('@')[0];
+        final otherUserAvatar = userResponse['avatar_url'] as String?;
+
+        return Chat.fromJson({
+          ...response,
+          'name': otherUserName,
+          'avatar_url': otherUserAvatar,
+        });
       }
 
-      // Create new chat
+      // Create new chat (without fixed name/avatar for private chats)
       final newChat = await _supabase
           .from('chats')
           .insert({
             'type': 'private',
             'activity_id': null,
-            'name': user2Name,
+            'name': null,  // Will be populated dynamically
+            'avatar_url': null,  // Will be populated dynamically
             'participants': [user1Id, user2Id],
             'last_message': null,
             'last_message_time': DateTime.now().toIso8601String(),
@@ -126,7 +134,23 @@ class ChatService {
           .select()
           .single();
 
-      return Chat.fromJson(newChat);
+      // Get other user's info for display
+      final userResponse = await _supabase
+          .from('users')
+          .select('full_name, email, avatar_url')
+          .eq('id', user2Id)
+          .single();
+
+      final otherUserName =
+          (userResponse['full_name'] as String?) ??
+          (userResponse['email'] as String).split('@')[0];
+      final otherUserAvatar = userResponse['avatar_url'] as String?;
+
+      return Chat.fromJson({
+        ...newChat,
+        'name': otherUserName,
+        'avatar_url': otherUserAvatar,
+      });
     } catch (e) {
       print('Error getting or creating chat: $e');
       rethrow;
