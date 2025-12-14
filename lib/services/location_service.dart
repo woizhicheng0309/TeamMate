@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
 class LocationService {
+  // 位置緩存
+  static Position? _cachedPosition;
+  static DateTime? _cacheTime;
+  static const Duration _cacheValidity = Duration(minutes: 5);
   // Check and request location permissions
   Future<bool> checkPermissions() async {
     bool serviceEnabled;
@@ -29,18 +34,38 @@ class LocationService {
   }
 
   // Get current position
-  Future<Position?> getCurrentPosition() async {
+  Future<Position?> getCurrentPosition({bool forceRefresh = false}) async {
     try {
+      // 檢查緩存
+      if (!forceRefresh && _cachedPosition != null && _cacheTime != null) {
+        final cacheAge = DateTime.now().difference(_cacheTime!);
+        if (cacheAge < _cacheValidity) {
+          print('Using cached location (${cacheAge.inSeconds}s old)');
+          return _cachedPosition;
+        }
+      }
+
       final hasPermission = await checkPermissions();
       if (!hasPermission) {
         return null;
       }
 
-      return await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
         ),
-      );
+      ).timeout(const Duration(seconds: 10), onTimeout: () {
+        // 如果超時，嘗試使用最後已知位置
+        return Geolocator.getLastKnownPosition().then((pos) {
+          return pos ?? _cachedPosition ?? (throw TimeoutException('Location timeout'));
+        });
+      });
+
+      // 更新緩存
+      _cachedPosition = position;
+      _cacheTime = DateTime.now();
+      
+      return position;
     } catch (e) {
       print('Error getting current position: $e');
       return null;

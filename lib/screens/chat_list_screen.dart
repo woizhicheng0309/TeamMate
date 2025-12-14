@@ -288,12 +288,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     ),
                   ),
                   TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已送出好友邀請'), duration: Duration(seconds: 2)),
-                      );
-                      // TODO: 接入真正的好友申請 API
+                    onPressed: () async {
+                      try {
+                        final currentUserId = _authService.currentUser?.id;
+                        if (currentUserId == null) {
+                          throw Exception('用戶未登入');
+                        }
+                        await _db.sendFriendRequest(currentUserId, userId);
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已送出好友邀請'), duration: Duration(seconds: 2)),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('發送失敗: $e')),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.person_add_alt_1),
                     label: const Text('加好友'),

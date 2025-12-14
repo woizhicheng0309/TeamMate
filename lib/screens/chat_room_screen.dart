@@ -27,6 +27,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   void initState() {
     super.initState();
     _markAsRead();
+    // 對於群組聊天，提前批量加載所有參與者的頭像
+    if (widget.chat.type == 'group') {
+      _preloadAllAvatars();
+    }
+  }
+
+  // 批量預加載群組成員頭像
+  Future<void> _preloadAllAvatars() async {
+    for (final participantId in widget.chat.participants) {
+      if (participantId != _authService.userId) {
+        _ensureAvatar(participantId);
+      }
+    }
   }
 
   @override
@@ -204,6 +217,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       return _buildSystemMessage(message);
                     }
 
+                    // 對於群組聊天，預載入發送者頭像
+                    if (widget.chat.type == 'group' && !isMe) {
+                      _ensureAvatar(message.senderId);
+                    }
+
                     return _buildMessage(message, isMe);
                   },
                 );
@@ -364,11 +382,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (currentUserId == null) return false;
 
     try {
-      // TODO: 實現真正的好友關係查詢
-      // 這裡應該查詢 friends 表，檢查是否存在好友關係
-      // 目前先返回 false，表示都不是好友
-      return false;
+      final status = await _db.checkFriendshipStatus(currentUserId, userId);
+      return status == 'accepted';
     } catch (e) {
+      print('Error checking friendship: $e');
       return false;
     }
   }
@@ -457,12 +474,25 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   else if (isFriend)
                     // 已經是好友，顯示刪除好友按鈕
                     OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: 實現刪除好友功能
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('刪除好友功能尚未實現')),
-                        );
-                        Navigator.pop(context);
+                      onPressed: () async {
+                        try {
+                          final currentUserId = _authService.userId;
+                          if (currentUserId == null) {
+                            throw Exception('用戶未登入');
+                          }
+                          await _db.removeFriend(currentUserId, userId);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已刪除好友')),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('刪除失敗: $e')),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.person_remove),
                       label: const Text('刪除好友'),
@@ -474,12 +504,25 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   else
                     // 還不是好友，顯示加好友按鈕
                     ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: 實現加好友功能
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('加好友功能尚未實現')),
-                        );
-                        Navigator.pop(context);
+                      onPressed: () async {
+                        try {
+                          final currentUserId = _authService.userId;
+                          if (currentUserId == null) {
+                            throw Exception('用戶未登入');
+                          }
+                          await _db.sendFriendRequest(currentUserId, userId);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已送出好友邀請')),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('發送失敗: $e')),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.person_add),
                       label: const Text('加好友'),

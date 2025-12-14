@@ -55,10 +55,11 @@ class _NearbyActivitiesScreenState extends State<NearbyActivitiesScreen> {
   }
 
   Future<void> _loadActivities() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      // Get current location
+      // Get current location (使用緩存)
       _currentPosition = await _locationService.getCurrentPosition();
 
       if (_currentPosition != null) {
@@ -124,7 +125,7 @@ class _NearbyActivitiesScreenState extends State<NearbyActivitiesScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildLoadingSkeleton()
           : RefreshIndicator(
               onRefresh: _loadActivities,
               child: _filteredActivities.isEmpty
@@ -156,6 +157,53 @@ class _NearbyActivitiesScreenState extends State<NearbyActivitiesScreen> {
                       },
                     ),
             ),
+    );
+  }
+
+  // 加載中的骨架屏
+  Widget _buildLoadingSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 24,
+                  width: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 16,
+                  width: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 16,
+                  width: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

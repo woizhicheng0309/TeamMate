@@ -69,12 +69,20 @@ class DatabaseService {
     double radiusKm = 10.0,
   }) async {
     try {
-      // Using PostGIS for geospatial queries
+      // Using PostGIS for geospatial queries with timeout
       final response = await _supabase
           .from('activities')
           .select()
           .gte('event_date', DateTime.now().toIso8601String())
-          .order('event_date', ascending: true);
+          .order('event_date', ascending: true)
+          .limit(50) // 限制返回數量以提升速度
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print('Database query timeout, returning empty list');
+              return [];
+            },
+          );
 
       final activities = (response as List)
           .map((json) => Activity.fromJson(json))
@@ -653,6 +661,80 @@ class DatabaseService {
           .eq('id', requestId);
     } catch (e) {
       print('Error rejecting join request: $e');
+      rethrow;
+    }
+  }
+
+  // ==================== 好友功能 ====================
+  
+  /// 發送好友申請
+  Future<void> sendFriendRequest(String fromUserId, String toUserId) async {
+    try {
+      // 檢查是否已經是好友
+      final existingFriendship = await _supabase
+          .from('friendships')
+          .select()
+          .or('and(user_id.eq.$fromUserId,friend_id.eq.$toUserId),and(user_id.eq.$toUserId,friend_id.eq.$fromUserId)')
+          .maybeSingle();
+
+      if (existingFriendship != null) {
+        throw Exception('已經是好友或已有待處理的申請');
+      }
+
+      // 創建好友申請
+      await _supabase.from('friendships').insert({
+        'user_id': fromUserId,
+        'friend_id': toUserId,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      print('Error sending friend request: $e');
+      rethrow;
+    }
+  }
+
+  /// 檢查好友關係
+  Future<String?> checkFriendshipStatus(String userId1, String userId2) async {
+    try {
+      final friendship = await _supabase
+          .from('friendships')
+          .select()
+          .or('and(user_id.eq.$userId1,friend_id.eq.$userId2),and(user_id.eq.$userId2,friend_id.eq.$userId1)')
+          .maybeSingle();
+
+      if (friendship == null) return null;
+      return friendship['status'] as String;
+    } catch (e) {
+      print('Error checking friendship: $e');
+      return null;
+    }
+  }
+
+  /// 接受好友申請
+  Future<void> acceptFriendRequest(String userId, String friendId) async {
+    try {
+      await _supabase
+          .from('friendships')
+          .update({'status': 'accepted'})
+          .eq('user_id', friendId)
+          .eq('friend_id', userId)
+          .eq('status', 'pending');
+    } catch (e) {
+      print('Error accepting friend request: $e');
+      rethrow;
+    }
+  }
+
+  /// 刪除好友
+  Future<void> removeFriend(String userId, String friendId) async {
+    try {
+      await _supabase
+          .from('friendships')
+          .delete()
+          .or('and(user_id.eq.$userId,friend_id.eq.$friendId),and(user_id.eq.$friendId,friend_id.eq.$userId)');
+    } catch (e) {
+      print('Error removing friend: $e');
       rethrow;
     }
   }

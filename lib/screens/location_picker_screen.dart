@@ -44,13 +44,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (widget.initialLocation != null) {
       _selectedLocation = widget.initialLocation!;
       _updateAddress(_selectedLocation);
-      // 只在有初始位置时加载设施
-      if (widget.detectFacilities) {
-        _loadFacilitiesAndSports(_selectedLocation);
-      }
-      if (widget.showActivities) {
-        _loadNearbyActivities(_selectedLocation);
-      }
+      // 延遲加載設施以加快地圖顯示
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        if (widget.detectFacilities) {
+          _loadFacilitiesAndSports(_selectedLocation);
+        }
+        if (widget.showActivities) {
+          _loadNearbyActivities(_selectedLocation);
+        }
+      });
     } else {
       // 没有初始位置时才获取当前位置
       _getCurrentLocation();
@@ -145,9 +148,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     });
     _updateAddress(location);
 
-    // 延遲載入設施以避免過度查詢
+    // 延遲載入設施以避免過度查詢（減少延遲時間以提升響應速度）
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
       if (!mounted) return;
       if (widget.detectFacilities) {
         _loadFacilitiesAndSports(location);
@@ -161,22 +164,24 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   /// 載入運動設施和檢測適合的運動
   Future<void> _loadFacilitiesAndSports(LatLng location) async {
     try {
-      final facilities = await _overpassService.queryNearbyFacilities(
-        latitude: location.latitude,
-        longitude: location.longitude,
-        radiusMeters: 50,
-      );
-
-      final suitableSports = await _overpassService.detectSuitableSports(
-        latitude: location.latitude,
-        longitude: location.longitude,
-        radiusMeters: 50,
-      );
+      // 並行查詢以加快速度
+      final results = await Future.wait([
+        _overpassService.queryNearbyFacilities(
+          latitude: location.latitude,
+          longitude: location.longitude,
+          radiusMeters: 50,
+        ),
+        _overpassService.detectSuitableSports(
+          latitude: location.latitude,
+          longitude: location.longitude,
+          radiusMeters: 50,
+        ),
+      ]);
 
       if (mounted) {
         setState(() {
-          _facilities = facilities;
-          _suitableSports = suitableSports;
+          _facilities = results[0] as List<SportsFacility>;
+          _suitableSports = results[1] as List<String>;
         });
         _updateMarkers();
       }

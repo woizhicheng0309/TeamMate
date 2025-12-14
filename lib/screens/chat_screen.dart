@@ -20,11 +20,25 @@ class _ChatScreenState extends State<ChatScreen> {
   final DatabaseService _db = DatabaseService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final Map<String, String?> _avatarCache = {};
 
   @override
   void initState() {
     super.initState();
     _markMessagesAsRead();
+    // 對於群組聊天，提前批量加載所有參與者的頭像
+    if (widget.chat.type == 'group') {
+      _preloadAllAvatars();
+    }
+  }
+
+  // 批量預加載群組成員頭像
+  Future<void> _preloadAllAvatars() async {
+    for (final participantId in widget.chat.participants) {
+      if (participantId != _authService.currentUser?.id) {
+        _ensureAvatar(participantId);
+      }
+    }
   }
 
   @override
@@ -214,6 +228,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     final isMe =
                         message.senderId == _authService.currentUser?.id;
 
+                    // 對於群組聊天，預載入發送者頭像
+                    if (widget.chat.type == 'group' && !isMe) {
+                      _ensureAvatar(message.senderId);
+                    }
+
                     return _buildMessageBubble(message, isMe);
                   },
                 );
@@ -277,10 +296,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildMessageBubble(Message message, bool isMe) {
     // For private chats, use the chat's avatar (other user's avatar)
-    // For group chats, use the sender's avatar from the message
+    // For group chats, use the sender's avatar from the message or cache
     final String? effectiveAvatar = widget.chat.type == 'private' 
         ? widget.chat.avatarUrl 
-        : message.senderAvatar;
+        : (message.senderAvatar ?? _avatarCache[message.senderId]);
     
     // 獲取當前用戶的頭像
     String? myAvatar;
@@ -406,17 +425,25 @@ class _ChatScreenState extends State<ChatScreen> {
       return '${time.month}/${time.day}';
     }
   }
-
+  // 當接收到訊息時，嘗試預載入缺失的頭像（僅對方）
+  Future<void> _ensureAvatar(String userId) async {
+    if (_avatarCache.containsKey(userId)) return;
+    try {
+      final profile = await _db.getUserProfile(userId);
+      final url = profile?.photoUrl;
+      _avatarCache[userId] = url;
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
   Future<bool> _checkFriendship(String userId) async {
     final currentUserId = _authService.currentUser?.id;
     if (currentUserId == null) return false;
 
     try {
-      // TODO: 實現真正的好友關係查詢
-      // 這裡應該查詢 friends 表，檢查是否存在好友關係
-      // 目前先返回 false，表示都不是好友
-      return false;
+      final status = await _db.checkFriendshipStatus(currentUserId, userId);
+      return status == 'accepted';
     } catch (e) {
+      print('Error checking friendship: $e');
       return false;
     }
   }
@@ -505,12 +532,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   else if (isFriend)
                     // 已經是好友，顯示刪除好友按鈕
                     OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: 實現刪除好友功能
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('刪除好友功能尚未實現')),
-                        );
-                        Navigator.pop(context);
+                      onPressed: () async {
+                        try {
+                          final currentUserId = _authService.userId;
+                          if (currentUserId == null) throw Exception('用戶未登入');
+                          await _db.removeFriend(currentUserId, userId);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已刪除好友')),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('刪除失敗: $e')),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.person_remove),
                       label: const Text('刪除好友'),
@@ -522,12 +560,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   else
                     // 還不是好友，顯示加好友按鈕
                     ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: 實現加好友功能
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('加好友功能尚未實現')),
-                        );
-                        Navigator.pop(context);
+                      onPressed: () async {
+                        try {
+                          final currentUserId = _authService.userId;
+                          if (currentUserId == null) throw Exception('用戶未登入');
+                          await _db.sendFriendRequest(currentUserId, userId);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已送出好友邀請')),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('發送失敗: $e')),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.person_add),
                       label: const Text('加好友'),

@@ -65,7 +65,10 @@ class OverpassService {
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: {'data': query},
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 8), onTimeout: () {
+            print('Overpass API timeout, returning empty result');
+            return http.Response('{"elements":[]}', 200);
+          });
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -98,30 +101,42 @@ class OverpassService {
     required double longitude,
     double radiusMeters = 300,
   }) async {
-    final facilities = await queryNearbyFacilities(
-      latitude: latitude,
-      longitude: longitude,
-      radiusMeters: radiusMeters,
-    );
+    // 使用更短的超時時間來加快檢測速度
+    try {
+      final facilities = await queryNearbyFacilities(
+        latitude: latitude,
+        longitude: longitude,
+        radiusMeters: radiusMeters,
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          print('Sport detection timeout, returning empty list');
+          return [];
+        },
+      );
 
-    if (facilities.isEmpty) {
+      if (facilities.isEmpty) {
+        return [];
+      }
+
+      // 統計各種運動設施的數量
+      final sportCounts = <String, int>{};
+      for (final facility in facilities) {
+        for (final sport in facility.suitableSports) {
+          sportCounts[sport] = (sportCounts[sport] ?? 0) + 1;
+        }
+      }
+
+      // 返回有設施的運動類型，按數量排序
+      final suitableSports =
+          sportCounts.entries.where((e) => e.value > 0).toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+
+      return suitableSports.map((e) => e.key).toList();
+    } catch (e) {
+      print('Error detecting suitable sports: $e');
       return [];
     }
-
-    // 統計各種運動設施的數量
-    final sportCounts = <String, int>{};
-    for (final facility in facilities) {
-      for (final sport in facility.suitableSports) {
-        sportCounts[sport] = (sportCounts[sport] ?? 0) + 1;
-      }
-    }
-
-    // 返回有設施的運動類型，按數量排序
-    final suitableSports =
-        sportCounts.entries.where((e) => e.value > 0).toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-
-    return suitableSports.map((e) => e.key).toList();
   }
 
   /// 建構 Overpass 查詢語句

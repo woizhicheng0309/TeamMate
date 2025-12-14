@@ -52,11 +52,11 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   @override
   void initState() {
     super.initState();
-    _showLocationPicker();
+    // 不再自動打開地圖，讓用戶手動選擇
   }
 
   Future<void> _showLocationPicker() async {
-    // 获取当前位置作为初始位置
+    // 快速獲取位置（使用緩存，不顯示加載對話框）
     final position = await _locationService.getCurrentPosition();
     final initialLocation = position != null
         ? LatLng(position.latitude, position.longitude)
@@ -205,11 +205,49 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 直接顯示表單，不等待位置選擇
     if (!_hasSelectedLocation) {
-      // 显示加载指示器，等待地图选择
       return Scaffold(
         appBar: AppBar(title: const Text('建立新活動')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add_location_alt,
+                  size: 80,
+                  color: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  '選擇活動地點',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '點擊下方按鈕來選擇你的活動地點',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: _showLocationPicker,
+                  icon: const Icon(Icons.map),
+                  label: const Text('選擇地點'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
