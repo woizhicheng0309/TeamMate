@@ -96,7 +96,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   _getPrivateChatAvatar(chat, userId);
                 }
               }
-              
+
               return items.map((chat) {
                 return Dismissible(
                   key: Key(chat.id),
@@ -205,7 +205,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 avatarUrl = _avatarCache[otherUserId];
               }
             }
-            
+
             return avatarUrl != null
                 ? ClipOval(
                     child: Image.network(
@@ -464,20 +464,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
   // Get avatar for a private chat (fetch other user's avatar)
   Future<String?> _getPrivateChatAvatar(Chat chat, String currentUserId) async {
     if (chat.type != 'private') return chat.avatarUrl;
-    
+
     // Find the other user's ID
     final otherUserId = chat.participants.firstWhere(
       (p) => p != currentUserId,
       orElse: () => '',
     );
-    
+
     if (otherUserId.isEmpty) return null;
-    
+
     // Check cache first
     if (_avatarCache.containsKey(otherUserId)) {
       return _avatarCache[otherUserId];
     }
-    
+
     // Fetch from database
     try {
       final profile = await _db.getUserProfile(otherUserId);

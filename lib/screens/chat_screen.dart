@@ -308,7 +308,10 @@ class _ChatScreenState extends State<ChatScreen> {
       displayAvatar = message.senderAvatar;
     } else {
       // For other users' messages, try multiple sources
-      displayAvatar = message.senderAvatar ?? _avatarCache[message.senderId] ?? widget.chat.avatarUrl;
+      displayAvatar =
+          message.senderAvatar ??
+          _avatarCache[message.senderId] ??
+          widget.chat.avatarUrl;
     }
 
     return Padding(
