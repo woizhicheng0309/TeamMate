@@ -8,14 +8,16 @@ class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState();
+  State<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
+class _NotificationSettingsScreenState
+    extends State<NotificationSettingsScreen> {
   final _notificationService = NotificationService();
   final _authService = AuthService();
   final _databaseService = DatabaseService();
-  
+
   bool _chatNotifications = true;
   bool _activityNotifications = true;
   bool _systemNotifications = true;
@@ -31,11 +33,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
 
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final hasPermission = await _notificationService.hasPermission();
       final userId = _authService.currentUser?.id;
-      
+
       if (userId != null) {
         final profile = await _databaseService.getUserProfile(userId);
         setState(() {
@@ -51,7 +53,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         });
       }
     } catch (e) {
-      print('Error loading settings: $e');
       setState(() {
         _pushEnabled = false;
       });
@@ -59,10 +60,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       setState(() => _isLoading = false);
     }
   }
-  
+
   Future<void> _saveSettings() async {
     if (_profile == null) return;
-    
+
     try {
       final updatedProfile = _profile!.copyWith(
         notificationChat: _chatNotifications,
@@ -72,17 +73,17 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       );
 
       await _databaseService.updateUserProfile(updatedProfile);
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('通知設定已保存')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('通知設定已保存')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失敗: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失敗: $e')));
       }
     }
   }
@@ -92,18 +93,18 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     setState(() {
       _pushEnabled = granted;
     });
-    
+
     if (granted) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('通知權限已開啟')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('通知權限已開啟')));
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('通知權限被拒絕')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('通知權限被拒絕')));
       }
     }
   }
@@ -111,15 +112,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('通知設定'),
-      ),
+      appBar: AppBar(title: const Text('通知設定')),
       body: ListView(
         children: [
           // Push Notifications
@@ -148,50 +145,59 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             },
             secondary: const Icon(Icons.notifications_active),
           ),
-          
+
           const Divider(),
-          
+
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text(
               '通知類型',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
           ),
-          
+
           // Chat Notifications
           SwitchListTile(
             title: const Text('聊天消息'),
             subtitle: const Text('有新消息時接收通知'),
             value: _chatNotifications,
-            onChanged: _pushEnabled ? (value) {
-              setState(() => _chatNotifications = value);              _saveSettings();            } : null,
+            onChanged: _pushEnabled
+                ? (value) {
+                    setState(() => _chatNotifications = value);
+                    _saveSettings();
+                  }
+                : null,
             secondary: const Icon(Icons.chat),
           ),
-          
+
           // Activity Notifications
           SwitchListTile(
             title: const Text('活動通知'),
             subtitle: const Text('活動更新和邀請通知'),
             value: _activityNotifications,
-            onChanged: _pushEnabled ? (value) {
-              setState(() => _activityNotifications = value);              _saveSettings();            } : null,
+            onChanged: _pushEnabled
+                ? (value) {
+                    setState(() => _activityNotifications = value);
+                    _saveSettings();
+                  }
+                : null,
             secondary: const Icon(Icons.event),
           ),
-          
+
           // System Notifications
           SwitchListTile(
             title: const Text('系統通知'),
             subtitle: const Text('系統消息和更新通知'),
             value: _systemNotifications,
-            onChanged: _pushEnabled ? (value) {
-              setState(() => _systemNotifications = value);              _saveSettings();            } : null,
+            onChanged: _pushEnabled
+                ? (value) {
+                    setState(() => _systemNotifications = value);
+                    _saveSettings();
+                  }
+                : null,
             secondary: const Icon(Icons.info),
           ),
-          
+
           if (!_pushEnabled)
             const Padding(
               padding: EdgeInsets.all(16),

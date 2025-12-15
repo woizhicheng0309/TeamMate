@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (e) {
-      print('Permission request error: $e');
+      // Silent fail on permission error
     }
   }
 

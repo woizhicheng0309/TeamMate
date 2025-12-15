@@ -7,13 +7,14 @@ class SportsPreferencesScreen extends StatefulWidget {
   const SportsPreferencesScreen({super.key});
 
   @override
-  State<SportsPreferencesScreen> createState() => _SportsPreferencesScreenState();
+  State<SportsPreferencesScreen> createState() =>
+      _SportsPreferencesScreenState();
 }
 
 class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
   final _authService = AuthService();
   final _databaseService = DatabaseService();
-  
+
   final List<String> _availableSports = [
     '籃球',
     '足球',
@@ -28,7 +29,7 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
     '登山',
     '騎自行車',
   ];
-  
+
   Set<String> _selectedSports = {};
   bool _isLoading = false;
   UserProfile? _profile;
@@ -41,7 +42,7 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
 
   Future<void> _loadPreferences() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final userId = _authService.currentUser?.id;
       if (userId != null) {
@@ -52,7 +53,7 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
         });
       }
     } catch (e) {
-      print('Error loading preferences: $e');
+      // Silent fail
     } finally {
       setState(() => _isLoading = false);
     }
@@ -60,7 +61,7 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
 
   Future<void> _savePreferences() async {
     if (_profile == null) return;
-    
+
     setState(() => _isLoading = true);
 
     try {
@@ -72,16 +73,16 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
       await _databaseService.updateUserProfile(updatedProfile);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('運動偏好已更新')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('運動偏好已更新')));
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失敗: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('更新失敗: $e')));
       }
     } finally {
       setState(() => _isLoading = false);
@@ -106,10 +107,7 @@ class _SportsPreferencesScreenState extends State<SportsPreferencesScreen> {
               ),
             )
           else
-            TextButton(
-              onPressed: _savePreferences,
-              child: const Text('儲存'),
-            ),
+            TextButton(onPressed: _savePreferences, child: const Text('儲存')),
         ],
       ),
       body: _isLoading

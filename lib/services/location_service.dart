@@ -40,7 +40,6 @@ class LocationService {
       if (!forceRefresh && _cachedPosition != null && _cacheTime != null) {
         final cacheAge = DateTime.now().difference(_cacheTime!);
         if (cacheAge < _cacheValidity) {
-          print('Using cached location (${cacheAge.inSeconds}s old)');
           return _cachedPosition;
         }
       }
@@ -50,24 +49,29 @@ class LocationService {
         return null;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      ).timeout(const Duration(seconds: 10), onTimeout: () {
-        // 如果超時，嘗試使用最後已知位置
-        return Geolocator.getLastKnownPosition().then((pos) {
-          return pos ?? _cachedPosition ?? (throw TimeoutException('Location timeout'));
-        });
-      });
+      final position =
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+            ),
+          ).timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              // 如果超時，嘗試使用最後已知位置
+              return Geolocator.getLastKnownPosition().then((pos) {
+                return pos ??
+                    _cachedPosition ??
+                    (throw TimeoutException('Location timeout'));
+              });
+            },
+          );
 
       // 更新緩存
       _cachedPosition = position;
       _cacheTime = DateTime.now();
-      
+
       return position;
     } catch (e) {
-      print('Error getting current position: $e');
       return null;
     }
   }
@@ -89,7 +93,6 @@ class LocationService {
       }
       return null;
     } catch (e) {
-      print('Error getting address: $e');
       return null;
     }
   }

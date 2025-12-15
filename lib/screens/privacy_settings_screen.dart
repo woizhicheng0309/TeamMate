@@ -13,7 +13,7 @@ class PrivacySettingsScreen extends StatefulWidget {
 class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   final _authService = AuthService();
   final _databaseService = DatabaseService();
-  
+
   bool _showEmail = true;
   bool _showPhone = false;
   bool _showLocation = true;
@@ -29,7 +29,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
 
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final userId = _authService.currentUser?.id;
       if (userId != null) {
@@ -43,7 +43,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading privacy settings: $e');
+      // Silent fail
     } finally {
       setState(() => _isLoading = false);
     }
@@ -51,7 +51,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
 
   Future<void> _saveSettings() async {
     if (_profile == null) return;
-    
+
     try {
       final updatedProfile = _profile!.copyWith(
         privacyShowEmail: _showEmail,
@@ -62,17 +62,17 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
       );
 
       await _databaseService.updateUserProfile(updatedProfile);
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('隱私設定已保存')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('隱私設定已保存')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失敗: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失敗: $e')));
       }
     }
   }
@@ -80,67 +80,63 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('隱私設定'),
-      ),
+      appBar: AppBar(title: const Text('隱私設定')),
       body: ListView(
         children: [
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text(
               '個人資訊可見性',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
           ),
-          
+
           SwitchListTile(
             title: const Text('顯示電子郵件'),
             subtitle: const Text('其他用戶可以看到你的電子郵件'),
             value: _showEmail,
             onChanged: (value) {
-              setState(() => _showEmail = value);              _saveSettings();            },
+              setState(() => _showEmail = value);
+              _saveSettings();
+            },
             secondary: const Icon(Icons.email),
           ),
-          
+
           SwitchListTile(
             title: const Text('顯示電話號碼'),
             subtitle: const Text('其他用戶可以看到你的電話號碼'),
             value: _showPhone,
             onChanged: (value) {
-              setState(() => _showPhone = value);              _saveSettings();            },
+              setState(() => _showPhone = value);
+              _saveSettings();
+            },
             secondary: const Icon(Icons.phone),
           ),
-          
+
           SwitchListTile(
             title: const Text('顯示位置'),
             subtitle: const Text('在活動中顯示你的位置'),
             value: _showLocation,
             onChanged: (value) {
-              setState(() => _showLocation = value);              _saveSettings();            },
+              setState(() => _showLocation = value);
+              _saveSettings();
+            },
             secondary: const Icon(Icons.location_on),
           ),
-          
+
           const Divider(),
-          
+
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text(
               '社交設定',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
           ),
-          
+
           SwitchListTile(
             title: const Text('允許好友邀請'),
             subtitle: const Text('其他用戶可以向你發送好友邀請'),
@@ -151,21 +147,21 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             },
             secondary: const Icon(Icons.person_add),
           ),
-          
+
           const Divider(),
-          
+
           ListTile(
             leading: const Icon(Icons.block, color: Colors.red),
             title: const Text('封鎖名單'),
             subtitle: const Text('管理已封鎖的用戶'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('封鎖名單功能開發中')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('封鎖名單功能開發中')));
             },
           ),
-          
+
           ListTile(
             leading: const Icon(Icons.delete_forever, color: Colors.red),
             title: const Text('刪除帳號'),
@@ -209,9 +205,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
     if (confirmed == true) {
       // TODO: Implement account deletion
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('帳號刪除功能開發中')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('帳號刪除功能開發中')));
       }
     }
   }

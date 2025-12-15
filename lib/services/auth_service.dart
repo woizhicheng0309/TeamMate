@@ -30,7 +30,6 @@ class AuthService {
 
       return response;
     } catch (e) {
-      print('Error signing in with Google: $e');
       rethrow;
     }
   }
@@ -51,7 +50,6 @@ class AuthService {
 
       return response;
     } catch (e) {
-      print('Error signing in with Google: $e');
       rethrow;
     }
   }
@@ -61,10 +59,9 @@ class AuthService {
     try {
       // 登出時清除 OneSignal 用戶 ID
       await _notificationService.logout();
-      
+
       await _supabase.auth.signOut();
     } catch (e) {
-      print('Error signing out: $e');
       rethrow;
     }
   }
@@ -87,7 +84,6 @@ class AuthService {
       final response = await _supabase.auth.refreshSession();
       return response;
     } catch (e) {
-      print('Error refreshing session: $e');
       rethrow;
     }
   }

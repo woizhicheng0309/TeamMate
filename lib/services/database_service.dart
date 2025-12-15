@@ -94,14 +94,14 @@ class DatabaseService {
         if (activity.latitude == null || activity.longitude == null) {
           return false;
         }
-        
+
         final distance = _calculateDistance(
           latitude,
           longitude,
           activity.latitude!,
           activity.longitude!,
         );
-        
+
         return distance <= radiusKm;
       }).toList();
 
@@ -141,7 +141,8 @@ class DatabaseService {
     final double dLat = _degreesToRadians(lat2 - lat1);
     final double dLon = _degreesToRadians(lon2 - lon1);
 
-    final double a = (math.sin(dLat / 2) * math.sin(dLat / 2)) +
+    final double a =
+        (math.sin(dLat / 2) * math.sin(dLat / 2)) +
         (math.cos(_degreesToRadians(lat1)) *
             math.cos(_degreesToRadians(lat2)) *
             math.sin(dLon / 2) *
@@ -213,7 +214,11 @@ class DatabaseService {
           .eq('id', activityId);
 
       // 自動加入群組聊天
-      await _joinActivityGroupChat(activityId, userId, activity['title'] ?? '活動');
+      await _joinActivityGroupChat(
+        activityId,
+        userId,
+        activity['title'] ?? '活動',
+      );
     } catch (e) {
       print('Error joining activity: $e');
       rethrow;
@@ -248,16 +253,15 @@ class DatabaseService {
       if (existingChat != null) {
         // 更新參與者列表
         final currentParticipants = Set<String>.from(
-          (existingChat['participants'] as List<dynamic>)
-              .map((e) => e.toString()),
+          (existingChat['participants'] as List<dynamic>).map(
+            (e) => e.toString(),
+          ),
         );
         currentParticipants.addAll(participantIds);
 
         await _supabase
             .from('chats')
-            .update({
-              'participants': currentParticipants.toList(),
-            })
+            .update({'participants': currentParticipants.toList()})
             .eq('id', existingChat['id']);
       } else {
         // 創建新群組聊天
@@ -726,7 +730,7 @@ class DatabaseService {
   }
 
   // ==================== 好友功能 ====================
-  
+
   /// 發送好友申請
   Future<void> sendFriendRequest(String fromUserId, String toUserId) async {
     try {
@@ -734,7 +738,9 @@ class DatabaseService {
       final existingFriendship = await _supabase
           .from('friendships')
           .select()
-          .or('and(user_id.eq.$fromUserId,friend_id.eq.$toUserId),and(user_id.eq.$toUserId,friend_id.eq.$fromUserId)')
+          .or(
+            'and(user_id.eq.$fromUserId,friend_id.eq.$toUserId),and(user_id.eq.$toUserId,friend_id.eq.$fromUserId)',
+          )
           .maybeSingle();
 
       if (existingFriendship != null) {
@@ -760,7 +766,9 @@ class DatabaseService {
       final friendship = await _supabase
           .from('friendships')
           .select()
-          .or('and(user_id.eq.$userId1,friend_id.eq.$userId2),and(user_id.eq.$userId2,friend_id.eq.$userId1)')
+          .or(
+            'and(user_id.eq.$userId1,friend_id.eq.$userId2),and(user_id.eq.$userId2,friend_id.eq.$userId1)',
+          )
           .maybeSingle();
 
       if (friendship == null) return null;
@@ -792,7 +800,9 @@ class DatabaseService {
       await _supabase
           .from('friendships')
           .delete()
-          .or('and(user_id.eq.$userId,friend_id.eq.$friendId),and(user_id.eq.$friendId,friend_id.eq.$userId)');
+          .or(
+            'and(user_id.eq.$userId,friend_id.eq.$friendId),and(user_id.eq.$friendId,friend_id.eq.$userId)',
+          );
     } catch (e) {
       print('Error removing friend: $e');
       rethrow;

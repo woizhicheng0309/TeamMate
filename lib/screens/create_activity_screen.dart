@@ -129,13 +129,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         _selectedTime.hour,
         _selectedTime.minute,
       );
-      
+
       // 轉換本地時間為 UTC（台灣時區 GMT+8）
-      final eventDateTimeUTC = eventDateTime.toUtc();
-      
-      print('⏰ 時間轉換:');
-      print('  本地時間: $eventDateTime');
-      print('  UTC 時間: $eventDateTimeUTC');
+      // 台灣本地時間減去 8 小時得到 UTC 時間
+      final eventDateTimeUTC = eventDateTime.subtract(const Duration(hours: 8));
 
       final activity = Activity(
         id: const Uuid().v4(),
@@ -145,7 +142,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             ? null
             : _descriptionController.text,
         activityType: _selectedActivityType!,
-        eventDate: eventDateTimeUTC,  // 使用 UTC 時間
+        eventDate: eventDateTimeUTC, // 使用 UTC 時間
         latitude: _selectedLocation!.latitude,
         longitude: _selectedLocation!.longitude,
         address: _address,

@@ -41,15 +41,19 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     _loadParticipants();
     _checkPendingRequest();
     _loadPendingRequests();
-    
+
     // 添加定时器在打卡窗口期间每秒刷新 UI
     _checkInWindowTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final now = DateTime.now().toUtc();  // 轉換為 UTC 時間
-      final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
-      final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
-      
+      final now = DateTime.now().toUtc(); // 轉換為 UTC 時間
+      final checkInStart = widget.activity.eventDate.subtract(
+        const Duration(minutes: 5),
+      );
+      final checkInEnd = widget.activity.eventDate.add(
+        const Duration(minutes: 5),
+      );
+
       // 如果在打卡窗口内或附近，就刷新 UI
-      if (now.isAfter(checkInStart.subtract(const Duration(minutes: 1))) && 
+      if (now.isAfter(checkInStart.subtract(const Duration(minutes: 1))) &&
           now.isBefore(checkInEnd.add(const Duration(minutes: 1)))) {
         if (mounted) {
           setState(() {});
@@ -396,18 +400,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         widget.activity.currentParticipants >= widget.activity.maxParticipants;
 
     // 調試打卡窗口
-    final now = DateTime.now().toUtc();  // 轉換為 UTC 時間
-    final checkInStart = widget.activity.eventDate.subtract(const Duration(minutes: 5));
-    final checkInEnd = widget.activity.eventDate.add(const Duration(minutes: 5));
-    final inCheckInWindow = now.isAfter(checkInStart) && now.isBefore(checkInEnd);
-    
-    print('🔍 打卡調試:');
-    print('  當前時間 (UTC): $now');
-    print('  活動時間: ${widget.activity.eventDate}');
-    print('  打卡窗口: $checkInStart ~ $checkInEnd');
-    print('  在窗口內: $inCheckInWindow');
-    print('  是創建者: $isCreator');
-    print('  已打卡: ${widget.activity.creatorCheckedIn}');
+    final now = DateTime.now().toUtc(); // 轉換為 UTC 時間
+    final checkInStart = widget.activity.eventDate.subtract(
+      const Duration(minutes: 5),
+    );
+    final checkInEnd = widget.activity.eventDate.add(
+      const Duration(minutes: 5),
+    );
+    final inCheckInWindow =
+        now.isAfter(checkInStart) && now.isBefore(checkInEnd);
 
     return Scaffold(
       appBar: AppBar(
@@ -526,7 +527,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '創建者已打卡 - 密碼: ${widget.activity.checkInCode}',
+                        '✅ 創建者已打卡',
                         style: const TextStyle(
                           color: Colors.green,
                           fontWeight: FontWeight.w500,
@@ -550,10 +551,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   _buildInfoRow(
                     Icons.calendar_today,
                     '日期時間',
-                    DateFormat(
-                      'yyyy/MM/dd HH:mm',
-                      'zh_TW',
-                    ).format(widget.activity.eventDate.add(const Duration(hours: 8))),  // UTC+8 台灣時區
+                    DateFormat('yyyy/MM/dd HH:mm', 'zh_TW').format(
+                      widget.activity.eventDate.add(const Duration(hours: 8)),
+                    ), // UTC+8 台灣時區
                   ),
                   const Divider(),
                   _buildInfoRow(
@@ -623,7 +623,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       const Icon(Icons.group, size: 20),
                       const SizedBox(width: 8),
                       Text(
-                        '參加者 (${_participants.length + 1})',
+                        '參加者 (${_participants.length})',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

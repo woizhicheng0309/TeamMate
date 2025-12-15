@@ -82,13 +82,12 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
         activityLng: widget.activity.longitude,
       );
 
-      if (success) {
-        // Get the check-in code from the activity
-        // In a real app, we'd fetch this from the database
+      if (success != null) {
+        // Get the check-in code from the response
         setState(() {
           _checkedIn = true;
           _timer.cancel();
-          _checkInCode = '****'; // Will be fetched from DB
+          _checkInCode = success; // Use the actual returned code
         });
 
         if (mounted) {
@@ -300,11 +299,19 @@ class _CreatorCheckInScreenState extends State<CreatorCheckInScreen> {
                                   icon: const Icon(Icons.content_copy),
                                   onPressed: _checkInCode != null
                                       ? () {
-                                          Clipboard.setData(ClipboardData(text: _checkInCode!));
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          Clipboard.setData(
+                                            ClipboardData(text: _checkInCode!),
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             SnackBar(
-                                              content: Text('已複製密碼: $_checkInCode'),
-                                              duration: const Duration(seconds: 2),
+                                              content: Text(
+                                                '已複製密碼: $_checkInCode',
+                                              ),
+                                              duration: const Duration(
+                                                seconds: 2,
+                                              ),
                                             ),
                                           );
                                         }

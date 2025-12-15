@@ -73,7 +73,6 @@ class ChatService {
                   chats.add(chat);
                 }
               } catch (e) {
-                print('Error getting other user info: $e');
                 chats.add(chat);
               }
             } else {
@@ -99,8 +98,9 @@ class ChatService {
 
       if (response != null) {
         // Get other user's info for display
-        final otherUserId = (response['participants'] as List)
-            .firstWhere((id) => id != user1Id);
+        final otherUserId = (response['participants'] as List).firstWhere(
+          (id) => id != user1Id,
+        );
         final userResponse = await _supabase
             .from('users')
             .select('full_name, email, avatar_url')
@@ -125,8 +125,9 @@ class ChatService {
           .insert({
             'type': 'private',
             'activity_id': null,
-            'name': null,  // Will be populated dynamically
-            'avatar_url': null,  // Will be populated dynamically
+            'name':
+                'Private Chat', // Required by database, will be overridden dynamically
+            'avatar_url': null, // Will be populated dynamically
             'participants': [user1Id, user2Id],
             'last_message': null,
             'last_message_time': DateTime.now().toIso8601String(),
@@ -152,7 +153,6 @@ class ChatService {
         'avatar_url': otherUserAvatar,
       });
     } catch (e) {
-      print('Error getting or creating chat: $e');
       rethrow;
     }
   }
@@ -198,7 +198,6 @@ class ChatService {
 
       return Chat.fromJson(newChat);
     } catch (e) {
-      print('Error getting or creating group chat: $e');
       rethrow;
     }
   }
@@ -229,7 +228,9 @@ class ChatService {
             .select('avatar_url')
             .eq('id', senderId)
             .maybeSingle();
-        senderAvatar = profile != null ? profile['avatar_url'] as String? : null;
+        senderAvatar = profile != null
+            ? profile['avatar_url'] as String?
+            : null;
       } catch (_) {}
 
       // Insert message（包含 sender_avatar）
@@ -259,7 +260,6 @@ class ChatService {
         message: content,
       );
     } catch (e) {
-      print('Error sending message: $e');
       rethrow;
     }
   }
@@ -272,8 +272,6 @@ class ChatService {
     required String message,
   }) async {
     try {
-      print('🔔 開始發送推送通知...');
-
       // 根據發送者的隱私設定決定顯示名稱（暱稱或電子郵件）
       String displaySenderName = senderName;
       try {
@@ -284,7 +282,8 @@ class ChatService {
             .maybeSingle();
 
         if (senderProfile != null) {
-          final allowShowEmail = senderProfile['privacy_show_email'] as bool? ?? true;
+          final allowShowEmail =
+              senderProfile['privacy_show_email'] as bool? ?? true;
           final fullName = senderProfile['full_name'] as String?;
           final email = senderProfile['email'] as String?;
 
@@ -295,11 +294,13 @@ class ChatService {
                 : (email != null ? (email.split('@').first) : senderName);
           } else {
             // 開啟電子郵件顯示時，使用 email 前綴（保持簡潔）
-            displaySenderName = (email != null ? (email.split('@').first) : (fullName ?? senderName));
+            displaySenderName = (email != null
+                ? (email.split('@').first)
+                : (fullName ?? senderName));
           }
         }
       } catch (e) {
-        print('⚠️ 讀取發送者隱私設定失敗，使用原始名稱: $e');
+        // Silent fail - use original sender name
       }
 
       // 獲取聊天參與者
@@ -313,13 +314,9 @@ class ChatService {
           .map((e) => e.toString())
           .toList();
 
-      print('📋 聊天參與者: $participants');
-
       // 給除了發送者之外的所有參與者發送通知
       for (final participantId in participants) {
         if (participantId != senderId) {
-          print('📤 檢查用戶 $participantId 的通知設定...');
-
           try {
             // 檢查用戶的通知設定
             final userSettings = await _supabase
@@ -328,14 +325,12 @@ class ChatService {
                 .eq('id', participantId)
                 .maybeSingle();
 
-            final chatNotificationEnabled = userSettings?['notification_chat'] as bool? ?? true;
+            final chatNotificationEnabled =
+                userSettings?['notification_chat'] as bool? ?? true;
 
             if (!chatNotificationEnabled) {
-              print('🔕 用戶 $participantId 已關閉聊天通知，跳過發送');
               continue;
             }
-
-            print('✅ 用戶 $participantId 已開啟聊天通知，準備發送...');
 
             // 調用 Supabase Edge Function 發送通知
             final response = await _supabase.functions.invoke(
@@ -348,20 +343,13 @@ class ChatService {
                 'data': {'chat_id': chatId, 'sender_id': senderId},
               },
             );
-
-            print('✅ 推送通知已發送給用戶: $participantId');
-            print('📝 響應: $response');
           } catch (error) {
-            print('⚠️ 發送推送通知失敗: $error');
-            print('❌ 錯誤類型: ${error.runtimeType}');
-            // 繼續發送給其他參與者
+            // Silent fail - continue sending to other participants
           }
         }
       }
     } catch (e) {
-      print('⚠️ 發送推送通知錯誤: $e');
-      print('❌ 錯誤類型: ${e.runtimeType}');
-      // 不拋出錯誤，因為消息已經發送成功
+      // Silent fail - message already sent successfully
     }
   }
 
@@ -375,7 +363,7 @@ class ChatService {
           .neq('sender_id', userId)
           .eq('is_read', false);
     } catch (e) {
-      print('Error marking messages as read: $e');
+      // Silent fail
     }
   }
 
@@ -391,7 +379,6 @@ class ChatService {
 
       return (response as List).length;
     } catch (e) {
-      print('Error getting unread count: $e');
       return 0;
     }
   }
@@ -404,7 +391,6 @@ class ChatService {
           .update({'is_pinned': isPinned})
           .eq('id', chatId);
     } catch (e) {
-      print('Error updating chat pinned status: $e');
       rethrow;
     }
   }
@@ -414,7 +400,6 @@ class ChatService {
     try {
       await _supabase.from('chats').delete().eq('id', chatId);
     } catch (e) {
-      print('Error deleting chat: $e');
       rethrow;
     }
   }

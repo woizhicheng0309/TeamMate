@@ -101,7 +101,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         _loadNearbyActivities(newLocation);
       }
     } catch (e) {
-      print('Error getting current location: $e');
+      // Silent fail
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -130,7 +130,6 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         }
       }
     } catch (e) {
-      print('Error getting address: $e');
       if (mounted) {
         setState(() {
           _selectedAddress =
@@ -186,7 +185,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         _updateMarkers();
       }
     } catch (e) {
-      print('Error loading facilities: $e');
+      // Silent fail
     }
   }
 
@@ -206,7 +205,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         _updateMarkers();
       }
     } catch (e) {
-      print('Error loading activities: $e');
+      // Silent fail
     }
   }
 

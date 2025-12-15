@@ -33,7 +33,6 @@ class ApiService {
         throw Exception('Health check failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Health check error: $e');
       rethrow;
     }
   }
@@ -55,7 +54,6 @@ class ApiService {
         throw Exception('User sync failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('User sync error: $e');
       rethrow;
     }
   }
@@ -75,7 +73,6 @@ class ApiService {
         throw Exception('Get user failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Get user error: $e');
       rethrow;
     }
   }
@@ -109,7 +106,6 @@ class ApiService {
         throw Exception('Get nearby activities failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Get nearby activities error: $e');
       rethrow;
     }
   }
@@ -130,7 +126,6 @@ class ApiService {
         throw Exception('Create activity failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Create activity error: $e');
       rethrow;
     }
   }
@@ -150,7 +145,6 @@ class ApiService {
         throw Exception('Get activity failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Get activity error: $e');
       rethrow;
     }
   }
@@ -168,7 +162,6 @@ class ApiService {
         throw Exception('Join activity failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Join activity error: $e');
       rethrow;
     }
   }
@@ -186,7 +179,6 @@ class ApiService {
         throw Exception('Leave activity failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Leave activity error: $e');
       rethrow;
     }
   }
@@ -207,7 +199,6 @@ class ApiService {
         throw Exception('Get user activities failed: ${response.statusCode}');
       }
     } catch (e) {
-      print('Get user activities error: $e');
       rethrow;
     }
   }

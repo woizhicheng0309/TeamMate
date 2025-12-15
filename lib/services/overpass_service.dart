@@ -38,7 +38,6 @@ class OverpassService {
 
       // 检查缓存
       if (_cache.containsKey(cacheKey)) {
-        print('Using cached Overpass data for $cacheKey');
         return _cache[cacheKey] as List<SportsFacility>;
       }
 
@@ -65,10 +64,12 @@ class OverpassService {
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: {'data': query},
           )
-          .timeout(const Duration(seconds: 8), onTimeout: () {
-            print('Overpass API timeout, returning empty result');
-            return http.Response('{"elements":[]}', 200);
-          });
+          .timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              return http.Response('{"elements":[]}', 200);
+            },
+          );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -83,14 +84,11 @@ class OverpassService {
 
         return facilities;
       } else if (response.statusCode == 429) {
-        print('Overpass API rate limit exceeded, using empty result');
         return [];
       } else {
-        print('Overpass API error: ${response.statusCode}');
         return [];
       }
     } catch (e) {
-      print('Error querying Overpass API: $e');
       return [];
     }
   }
@@ -107,13 +105,7 @@ class OverpassService {
         latitude: latitude,
         longitude: longitude,
         radiusMeters: radiusMeters,
-      ).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          print('Sport detection timeout, returning empty list');
-          return [];
-        },
-      );
+      ).timeout(const Duration(seconds: 5), onTimeout: () => []);
 
       if (facilities.isEmpty) {
         return [];
@@ -134,7 +126,6 @@ class OverpassService {
 
       return suitableSports.map((e) => e.key).toList();
     } catch (e) {
-      print('Error detecting suitable sports: $e');
       return [];
     }
   }
@@ -190,7 +181,7 @@ out center;
 
         facilities.add(facility);
       } catch (e) {
-        print('Error parsing facility: $e');
+        // Silently skip parsing errors
       }
     }
 

@@ -13,14 +13,20 @@ class CheckInService {
   }
 
   // Check if user is within range of activity location (within 100 meters)
-  bool isWithinRange(double userLat, double userLng, double activityLat,
-      double activityLng, double radiusInMeters) {
+  bool isWithinRange(
+    double userLat,
+    double userLng,
+    double activityLat,
+    double activityLng,
+    double radiusInMeters,
+  ) {
     const earthRadiusMeters = 6371000.0;
 
     final dLat = _toRadians(activityLat - userLat);
     final dLng = _toRadians(activityLng - userLng);
 
-    final a = sin(dLat / 2) * sin(dLat / 2) +
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(_toRadians(userLat)) *
             cos(_toRadians(activityLat)) *
             sin(dLng / 2) *
@@ -37,7 +43,7 @@ class CheckInService {
   }
 
   // Creator checks in at activity location
-  Future<bool> creatorCheckIn({
+  Future<String?> creatorCheckIn({
     required String activityId,
     required double activityLat,
     required double activityLng,
@@ -47,8 +53,7 @@ class CheckInService {
       final permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        print('❌ 位置權限被拒絕');
-        return false;
+        return null;
       }
 
       // Get current position
@@ -59,34 +64,35 @@ class CheckInService {
         ),
       );
 
-      print(
-          '📍 當前位置: ${position.latitude}, ${position.longitude}');
-      print('🎯 活動位置: $activityLat, $activityLng');
-
       // Check if within 100 meters of activity location
-      if (!isWithinRange(position.latitude, position.longitude, activityLat,
-          activityLng, 100)) {
-        print('❌ GPS驗證失敗：距離活動地點過遠');
-        return false;
+      if (!isWithinRange(
+        position.latitude,
+        position.longitude,
+        activityLat,
+        activityLng,
+        100,
+      )) {
+        return null;
       }
 
       // Generate check-in code
       final checkInCode = generateCheckInCode();
 
       // Update activity with check-in info
-      await _supabase.from('activities').update({
-        'check_in_code': checkInCode,
-        'creator_checked_in': true,
-        'creator_check_in_time': DateTime.now().toIso8601String(),
-        'creator_check_in_location':
-            '(${position.longitude},${position.latitude})',  // PostgreSQL point format: (longitude, latitude)
-      }).eq('id', activityId);
+      await _supabase
+          .from('activities')
+          .update({
+            'check_in_code': checkInCode,
+            'creator_checked_in': true,
+            'creator_check_in_time': DateTime.now().toIso8601String(),
+            'creator_check_in_location':
+                '(${position.longitude},${position.latitude})', // PostgreSQL point format: (longitude, latitude)
+          })
+          .eq('id', activityId);
 
-      print('✅ 創建者打卡成功，密碼: $checkInCode');
-      return true;
+      return checkInCode;
     } catch (e) {
-      print('❌ 創建者打卡錯誤: $e');
-      return false;
+      return null;
     }
   }
 
@@ -106,26 +112,28 @@ class CheckInService {
           .eq('id', activityId)
           .single();
 
-      final correctCode = activity['check_in_code'] as String?;
+      // Handle both string and int types for check_in_code
+      var correctCode = activity['check_in_code'];
+      if (correctCode is int) {
+        correctCode = correctCode.toString();
+      }
+      correctCode = correctCode as String?;
+
       final creatorCheckedIn = activity['creator_checked_in'] as bool? ?? false;
 
       // Verify creator has checked in
       if (!creatorCheckedIn) {
-        print('❌ 創建者還未打卡');
         return false;
       }
 
-      // Verify code
-      if (correctCode == null || enteredCode != correctCode) {
-        print('❌ 密碼錯誤');
+      // Verify code (compare as strings)
+      if (correctCode == null || enteredCode.trim() != correctCode.trim()) {
         return false;
       }
 
-      // Request location permission
       final permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        print('❌ 位置權限被拒絕');
         return false;
       }
 
@@ -138,9 +146,13 @@ class CheckInService {
       );
 
       // Check if within 100 meters of activity location
-      if (!isWithinRange(position.latitude, position.longitude, activityLat,
-          activityLng, 100)) {
-        print('❌ GPS驗證失敗：距離活動地點過遠');
+      if (!isWithinRange(
+        position.latitude,
+        position.longitude,
+        activityLat,
+        activityLng,
+        100,
+      )) {
         return false;
       }
 
@@ -150,13 +162,12 @@ class CheckInService {
         'user_id': userId,
         'checked_in': true,
         'check_in_time': DateTime.now().toIso8601String(),
-        'check_in_location': '(${position.longitude},${position.latitude})',  // PostgreSQL point format: (longitude, latitude)
+        'check_in_location':
+            '(${position.longitude},${position.latitude})', // PostgreSQL point format: (longitude, latitude)
       });
 
-      print('✅ 參與者打卡成功');
       return true;
     } catch (e) {
-      print('❌ 參與者打卡錯誤: $e');
       return false;
     }
   }
@@ -167,13 +178,16 @@ class CheckInService {
         .from('participants_check_in')
         .stream(primaryKey: ['id'])
         .eq('activity_id', activityId)
-        .map((data) =>
-            data.map((json) => CheckInRecord.fromJson(json)).toList());
+        .map(
+          (data) => data.map((json) => CheckInRecord.fromJson(json)).toList(),
+        );
   }
 
   // Get check-in status for a participant
   Future<CheckInRecord?> getParticipantCheckInStatus(
-      String activityId, String userId) async {
+    String activityId,
+    String userId,
+  ) async {
     try {
       final response = await _supabase
           .from('participants_check_in')
@@ -188,7 +202,6 @@ class CheckInService {
 
       return CheckInRecord.fromJson(response);
     } catch (e) {
-      print('Error getting check-in status: $e');
       return null;
     }
   }
@@ -196,13 +209,11 @@ class CheckInService {
   // Mark activity as failed if creator didn't check in within time
   Future<void> markActivityAsFailed(String activityId) async {
     try {
-      await _supabase.from('activities').update({
-        'status': 'failed',
-      }).eq('id', activityId);
-
-      print('⚠️ 活動因創建者未打卡而被標記為失敗');
+      await _supabase
+          .from('activities')
+          .update({'status': 'failed'})
+          .eq('id', activityId);
     } catch (e) {
-      print('Error marking activity as failed: $e');
       rethrow;
     }
   }

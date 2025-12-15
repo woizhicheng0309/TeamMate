@@ -26,13 +26,10 @@ class RecommendationService {
           radius: radiusKm,
           token: token,
         );
-        print(
-          '✅ Got ${activities.length} recommended activities from AWS backend',
-        );
         return activities;
       }
     } catch (e) {
-      print('⚠️ AWS backend unavailable, falling back to Supabase: $e');
+      // Silent fail - fallback to Supabase
     }
 
     // Fallback: Use Supabase direct query
@@ -48,10 +45,8 @@ class RecommendationService {
           .map((json) => Activity.fromJson(json))
           .toList();
 
-      print('📊 Got ${activities.length} activities from Supabase');
       return activities;
     } catch (e) {
-      print('Error getting activities from Supabase: $e');
       return [];
     }
   }
@@ -62,10 +57,8 @@ class RecommendationService {
       final token = _supabase.auth.currentSession?.accessToken;
       if (token != null) {
         await _apiService.syncUser(user, token);
-        print('✅ User profile synced to AWS backend');
       }
     } catch (e) {
-      print('⚠️ Failed to sync user to AWS backend: $e');
       // Non-critical, continue without backend sync
     }
   }
@@ -82,10 +75,8 @@ class RecommendationService {
       // TODO: Implement when AWS backend adds this endpoint
       // final response = await _apiService.getSimilarUsers(userId, activityType, token);
 
-      print('ℹ️ Similar users feature pending AWS backend implementation');
       return [];
     } catch (e) {
-      print('Error getting similar users: $e');
       return [];
     }
   }
@@ -97,10 +88,8 @@ class RecommendationService {
       if (token == null) return {};
 
       // TODO: Implement when AWS backend adds analytics endpoint
-      print('ℹ️ Activity analytics feature pending AWS backend implementation');
       return {};
     } catch (e) {
-      print('Error getting activity analytics: $e');
       return {};
     }
   }

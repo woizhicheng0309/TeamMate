@@ -42,7 +42,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error loading profile: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -94,10 +93,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 50,
-                        backgroundImage: _userProfile?.photoUrl != null && _userProfile!.photoUrl!.isNotEmpty
+                        backgroundImage:
+                            _userProfile?.photoUrl != null &&
+                                _userProfile!.photoUrl!.isNotEmpty
                             ? NetworkImage(_userProfile!.photoUrl!)
                             : null,
-                        child: _userProfile?.photoUrl == null || _userProfile!.photoUrl!.isEmpty
+                        child:
+                            _userProfile?.photoUrl == null ||
+                                _userProfile!.photoUrl!.isEmpty
                             ? const Icon(Icons.person, size: 50)
                             : null,
                       ),
@@ -154,7 +157,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const SportsPreferencesScreen(),
+                              builder: (context) =>
+                                  const SportsPreferencesScreen(),
                             ),
                           );
                         },
@@ -168,7 +172,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const NotificationSettingsScreen(),
+                              builder: (context) =>
+                                  const NotificationSettingsScreen(),
                             ),
                           );
                         },
@@ -182,7 +187,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const PrivacySettingsScreen(),
+                              builder: (context) =>
+                                  const PrivacySettingsScreen(),
                             ),
                           );
                         },

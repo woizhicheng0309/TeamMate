@@ -93,7 +93,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final chatTitle = widget.chat.name ?? '聊天';
     final chatAvatar = widget.chat.avatarUrl;
-    
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -103,39 +103,45 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Row(
           children: [
             GestureDetector(
-              onTap: widget.chat.type == 'private' ? () async {
-                // 獲取對方 ID
-                final otherUserId = widget.chat.participants.firstWhere(
-                  (id) => id != _authService.currentUser?.id,
-                  orElse: () => '',
-                );
-                if (otherUserId.isNotEmpty) {
-                  final profile = await _db.getUserProfile(otherUserId);
-                  if (!mounted) return;
-                  _showUserInfoSheet(context, profile, otherUserId);
-                }
-              } : null,
+              onTap: widget.chat.type == 'private'
+                  ? () async {
+                      // 獲取對方 ID
+                      final otherUserId = widget.chat.participants.firstWhere(
+                        (id) => id != _authService.currentUser?.id,
+                        orElse: () => '',
+                      );
+                      if (otherUserId.isNotEmpty) {
+                        final profile = await _db.getUserProfile(otherUserId);
+                        if (!mounted) return;
+                        _showUserInfoSheet(context, profile, otherUserId);
+                      }
+                    }
+                  : null,
               child: chatAvatar != null && chatAvatar.isNotEmpty
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundImage: NetworkImage(chatAvatar),
-                      onBackgroundImageError: (_, __) {},
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: widget.chat.type == 'group' ? Colors.blue : Colors.green,
-                      child: Icon(
-                        widget.chat.type == 'group' ? Icons.group : Icons.person,
-                        color: Colors.white,
-                        size: 20,
+                  ? Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundImage: NetworkImage(chatAvatar),
+                        onBackgroundImageError: (_, __) {},
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: widget.chat.type == 'group'
+                            ? Colors.blue
+                            : Colors.green,
+                        child: Icon(
+                          widget.chat.type == 'group'
+                              ? Icons.group
+                              : Icons.person,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
-                  ),
             ),
             Expanded(
               child: Column(
@@ -228,8 +234,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     final isMe =
                         message.senderId == _authService.currentUser?.id;
 
-                    // 對於群組聊天，預載入發送者頭像
-                    if (widget.chat.type == 'group' && !isMe) {
+                    // Preload avatar if not in message (for messages sent before avatar feature)
+                    if (!isMe && message.senderAvatar == null) {
                       _ensureAvatar(message.senderId);
                     }
 
@@ -295,19 +301,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(Message message, bool isMe) {
-    // For private chats, use the chat's avatar (other user's avatar)
-    // For group chats, use the sender's avatar from the message or cache
-    final String? effectiveAvatar = widget.chat.type == 'private' 
-        ? widget.chat.avatarUrl 
-        : (message.senderAvatar ?? _avatarCache[message.senderId]);
-    
-    // 獲取當前用戶的頭像
-    String? myAvatar;
-    if (isMe && _authService.currentUser != null) {
-      final metadata = _authService.currentUser!.userMetadata;
-      if (metadata != null) {
-        myAvatar = metadata['avatar_url'] as String?;
-      }
+    // Use sender's avatar from message for all cases
+    String? displayAvatar;
+    if (isMe) {
+      // For current user's message, use the avatar from the message
+      displayAvatar = message.senderAvatar;
+    } else {
+      // For other users' messages, try multiple sources
+      displayAvatar = message.senderAvatar ?? _avatarCache[message.senderId] ?? widget.chat.avatarUrl;
     }
 
     return Padding(
@@ -327,12 +328,15 @@ class _ChatScreenState extends State<ChatScreen> {
               },
               child: CircleAvatar(
                 radius: 16,
-                backgroundImage: effectiveAvatar != null && effectiveAvatar.isNotEmpty
-                    ? NetworkImage(effectiveAvatar)
+                backgroundImage:
+                    displayAvatar != null && displayAvatar.isNotEmpty
+                    ? NetworkImage(displayAvatar)
                     : null,
                 backgroundColor: Colors.grey[300],
-                onBackgroundImageError: effectiveAvatar != null ? (_, __) {} : null,
-                child: effectiveAvatar == null || effectiveAvatar.isEmpty
+                onBackgroundImageError: displayAvatar != null
+                    ? (_, __) {}
+                    : null,
+                child: displayAvatar == null || displayAvatar.isEmpty
                     ? Text(
                         message.senderName[0].toUpperCase(),
                         style: const TextStyle(fontSize: 14),
@@ -393,11 +397,11 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 8),
             CircleAvatar(
               radius: 16,
-              backgroundImage: myAvatar != null && myAvatar.isNotEmpty
-                  ? NetworkImage(myAvatar)
+              backgroundImage: displayAvatar != null && displayAvatar.isNotEmpty
+                  ? NetworkImage(displayAvatar)
                   : null,
               backgroundColor: Colors.grey[300],
-              child: myAvatar == null || myAvatar.isEmpty
+              child: displayAvatar == null || displayAvatar.isEmpty
                   ? Text(
                       message.senderName[0].toUpperCase(),
                       style: const TextStyle(fontSize: 14),
@@ -425,6 +429,7 @@ class _ChatScreenState extends State<ChatScreen> {
       return '${time.month}/${time.day}';
     }
   }
+
   // 當接收到訊息時，嘗試預載入缺失的頭像（僅對方）
   Future<void> _ensureAvatar(String userId) async {
     if (_avatarCache.containsKey(userId)) return;
@@ -435,6 +440,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) setState(() {});
     } catch (_) {}
   }
+
   Future<bool> _checkFriendship(String userId) async {
     final currentUserId = _authService.currentUser?.id;
     if (currentUserId == null) return false;
@@ -443,12 +449,15 @@ class _ChatScreenState extends State<ChatScreen> {
       final status = await _db.checkFriendshipStatus(currentUserId, userId);
       return status == 'accepted';
     } catch (e) {
-      print('Error checking friendship: $e');
       return false;
     }
   }
 
-  void _showUserInfoSheet(BuildContext context, UserProfile? profile, String userId) {
+  void _showUserInfoSheet(
+    BuildContext context,
+    UserProfile? profile,
+    String userId,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -459,7 +468,7 @@ class _ChatScreenState extends State<ChatScreen> {
           future: _checkFriendship(userId),
           builder: (context, snapshot) {
             final isFriend = snapshot.data ?? false;
-            
+
             return Container(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -469,12 +478,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       CircleAvatar(
                         radius: 32,
-                        backgroundImage: profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty
+                        backgroundImage:
+                            profile?.photoUrl != null &&
+                                profile!.photoUrl!.isNotEmpty
                             ? NetworkImage(profile.photoUrl!)
                             : null,
                         backgroundColor: Colors.blue,
-                        child: profile?.photoUrl == null || profile!.photoUrl!.isEmpty
-                            ? const Icon(Icons.person, size: 32, color: Colors.white)
+                        child:
+                            profile?.photoUrl == null ||
+                                profile!.photoUrl!.isEmpty
+                            ? const Icon(
+                                Icons.person,
+                                size: 32,
+                                color: Colors.white,
+                              )
                             : null,
                       ),
                       const SizedBox(width: 16),
@@ -503,7 +520,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  if (profile?.interests != null && profile!.interests!.isNotEmpty) ...[
+                  if (profile?.interests != null &&
+                      profile!.interests!.isNotEmpty) ...[
                     const Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -518,10 +536,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     Wrap(
                       spacing: 8,
                       children: profile.interests!
-                          .map((interest) => Chip(
-                                label: Text(interest),
-                                backgroundColor: Colors.blue[50],
-                              ))
+                          .map(
+                            (interest) => Chip(
+                              label: Text(interest),
+                              backgroundColor: Colors.blue[50],
+                            ),
+                          )
                           .toList(),
                     ),
                     const SizedBox(height: 16),
@@ -545,9 +565,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         } catch (e) {
                           if (!mounted) return;
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('刪除失敗: $e')),
-                          );
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('刪除失敗: $e')));
                         }
                       },
                       icon: const Icon(Icons.person_remove),
@@ -573,9 +593,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         } catch (e) {
                           if (!mounted) return;
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('發送失敗: $e')),
-                          );
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('發送失敗: $e')));
                         }
                       },
                       icon: const Icon(Icons.person_add),

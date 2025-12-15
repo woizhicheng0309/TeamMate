@@ -71,17 +71,30 @@ class _NearbyActivitiesScreenState extends State<NearbyActivitiesScreen> {
               longitude: _currentPosition!.longitude,
               radiusKm: 10.0,
             )
-            .listen((activities) {
-              if (mounted) {
-                setState(() {
-                  _activities = activities;
-                  _isLoading = false;
-                });
-              }
-            });
+            .listen(
+              (activities) {
+                if (mounted) {
+                  setState(() {
+                    _activities = activities;
+                    _isLoading = false;
+                  });
+                }
+              },
+              onError: (error) {
+                if (mounted) {
+                  setState(() => _isLoading = false);
+                }
+              },
+            );
+      } else {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('無法獲取您的位置，請檢查位置權限')));
+        }
       }
     } catch (e) {
-      print('Error loading activities: $e');
       setState(() => _isLoading = false);
     }
   }

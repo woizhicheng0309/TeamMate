@@ -18,13 +18,13 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen>
   final AuthService _authService = AuthService();
 
   late TabController _tabController;
-  
+
   List<Activity> _createdActivities = [];
   List<Activity> _joinedActivities = [];
   Map<String, int> _pendingCounts = {};
   bool _isLoadingCreated = true;
   bool _isLoadingJoined = true;
-  
+
   StreamSubscription<List<Activity>>? _createdSubscription;
   StreamSubscription<List<Activity>>? _joinedSubscription;
 
@@ -87,8 +87,11 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen>
         });
   }
 
-  Widget _buildActivityList(List<Activity> activities, bool isLoading,
-      {bool showPendingCount = false}) {
+  Widget _buildActivityList(
+    List<Activity> activities,
+    bool isLoading, {
+    bool showPendingCount = false,
+  }) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -98,11 +101,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.event_busy,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               showPendingCount ? '您還沒有加入任何活動' : '您還沒有建立任何活動',
@@ -170,14 +169,8 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(
-              icon: Icon(Icons.create),
-              text: '我創辦的',
-            ),
-            Tab(
-              icon: Icon(Icons.group),
-              text: '我加入的',
-            ),
+            Tab(icon: Icon(Icons.create), text: '我創辦的'),
+            Tab(icon: Icon(Icons.group), text: '我加入的'),
           ],
         ),
       ),

@@ -18,6 +18,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final AuthService _authService = AuthService();
   final DatabaseService _db = DatabaseService();
   String _category = 'stranger'; // 保留（若需狀態外用）
+  int _refreshKey = 0; // 用於強制刷新流
+  bool _isOperating = false; // 禁用操作時的 Dismissible
+  final Map<String, String?> _avatarCache = {}; // Cache for user avatars
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +35,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
         appBar: AppBar(
           title: const Text('聊天'),
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                setState(() => _refreshKey++);
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: '陌生人'),
@@ -41,6 +52,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ),
         body: StreamBuilder<List<Chat>>(
+          key: ValueKey(_refreshKey),
           stream: _chatService.getUserChats(userId),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -63,28 +75,43 @@ class _ChatListScreenState extends State<ChatListScreen> {
               );
             }
 
-            final pinnedChats = chats.where((c) => c.isPinned ?? false).toList();
-            final unpinnedChats = chats.where((c) => !(c.isPinned ?? false)).toList();
+            final pinnedChats = chats
+                .where((c) => c.isPinned ?? false)
+                .toList();
+            final unpinnedChats = chats
+                .where((c) => !(c.isPinned ?? false))
+                .toList();
             final sorted = [...pinnedChats, ...unpinnedChats];
 
             final groupChats = sorted.where((c) => c.type == 'group').toList();
-            final privateChats = sorted.where((c) => c.type != 'group').toList();
+            final privateChats = sorted
+                .where((c) => c.type != 'group')
+                .toList();
             final friendChats = <Chat>[];
 
             List<Widget> buildChildren(List<Chat> items) {
+              // Preload avatars for private chats
+              for (final chat in items) {
+                if (chat.type == 'private') {
+                  _getPrivateChatAvatar(chat, userId);
+                }
+              }
+              
               return items.map((chat) {
                 return Dismissible(
                   key: Key(chat.id),
                   direction: DismissDirection.horizontal,
                   background: _pinBackground(chat),
                   secondaryBackground: _deleteBackground(),
-                  onDismissed: (direction) {
-                    if (direction == DismissDirection.startToEnd) {
-                      _togglePinChat(chat);
-                    } else {
-                      _deleteChat(chat);
-                    }
-                  },
+                  onDismissed: _isOperating
+                      ? null
+                      : (direction) {
+                          if (direction == DismissDirection.startToEnd) {
+                            _togglePinChat(chat);
+                          } else {
+                            _deleteChat(chat);
+                          }
+                        },
                   child: _buildChatItem(chat, userId),
                 );
               }).toList();
@@ -120,7 +147,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
           const SizedBox(width: 8),
           Text(
             chat.isPinned ?? false ? '取消置頂' : '置頂',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -138,7 +168,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
         children: [
           Icon(Icons.delete, color: Colors.white),
           SizedBox(width: 8),
-          Text('刪除', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          Text(
+            '刪除',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -149,7 +182,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
       leading: GestureDetector(
         onTap: () async {
           if (chat.type == 'group') return; // 群組不顯示個人資料
-          final otherId = chat.participants.firstWhere((p) => p != currentUserId, orElse: () => '');
+          final otherId = chat.participants.firstWhere(
+            (p) => p != currentUserId,
+            orElse: () => '',
+          );
           if (otherId.isEmpty) return;
           final profile = await _db.getUserProfile(otherId);
           if (!mounted) return;
@@ -157,23 +193,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
         },
         child: CircleAvatar(
           backgroundColor: chat.type == 'group' ? Colors.blue : Colors.green,
-          child: chat.avatarUrl != null
-              ? ClipOval(
-                  child: Image.network(
-                    chat.avatarUrl!,
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
-                      chat.type == 'group' ? Icons.group : Icons.person,
-                      color: Colors.white,
+          child: () {
+            // Determine which avatar to use
+            String? avatarUrl = chat.avatarUrl;
+            if (chat.type == 'private' && avatarUrl == null) {
+              final otherUserId = chat.participants.firstWhere(
+                (p) => p != currentUserId,
+                orElse: () => '',
+              );
+              if (otherUserId.isNotEmpty) {
+                avatarUrl = _avatarCache[otherUserId];
+              }
+            }
+            
+            return avatarUrl != null
+                ? ClipOval(
+                    child: Image.network(
+                      avatarUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        chat.type == 'group' ? Icons.group : Icons.person,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                )
-              : Icon(
-                  chat.type == 'group' ? Icons.group : Icons.person,
-                  color: Colors.white,
-                ),
+                  )
+                : Icon(
+                    chat.type == 'group' ? Icons.group : Icons.person,
+                    color: Colors.white,
+                  );
+          }(),
         ),
       ),
       title: Row(
@@ -251,7 +301,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  void _showUserInfoSheet(BuildContext context, UserProfile? profile, String userId) {
+  void _showUserInfoSheet(
+    BuildContext context,
+    UserProfile? profile,
+    String userId,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -269,10 +323,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   CircleAvatar(
                     radius: 28,
                     backgroundColor: Colors.grey[300],
-                    backgroundImage: (profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty)
-                      ? NetworkImage(profile.photoUrl!)
+                    backgroundImage:
+                        (profile?.photoUrl != null &&
+                            profile!.photoUrl!.isNotEmpty)
+                        ? NetworkImage(profile.photoUrl!)
                         : null,
-                    child: (profile?.photoUrl == null || (profile?.photoUrl?.isEmpty ?? true))
+                    child:
+                        (profile?.photoUrl == null ||
+                            (profile?.photoUrl?.isEmpty ?? true))
                         ? const Icon(Icons.person, color: Colors.white)
                         : null,
                   ),
@@ -281,9 +339,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(profile?.displayName ?? '未知用戶', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(
+                          profile?.displayName ?? '未知用戶',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         if (profile?.email != null)
-                          Text(profile!.email!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text(
+                            profile!.email!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -298,14 +368,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         if (!context.mounted) return;
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已送出好友邀請'), duration: Duration(seconds: 2)),
+                          const SnackBar(
+                            content: Text('已送出好友邀請'),
+                            duration: Duration(seconds: 2),
+                          ),
                         );
                       } catch (e) {
                         if (!context.mounted) return;
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('發送失敗: $e')),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('發送失敗: $e')));
                       }
                     },
                     icon: const Icon(Icons.person_add_alt_1),
@@ -314,7 +387,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              const Text('運動偏好', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text(
+                '運動偏好',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -346,23 +422,109 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
-  void _togglePinChat(Chat chat) {
-    final newPinnedState = !(chat.isPinned ?? false);
-    _chatService.updateChatPinned(chat.id, newPinnedState);
+  void _togglePinChat(Chat chat) async {
+    try {
+      setState(() => _isOperating = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(newPinnedState ? '聊天已置頂' : '聊天已取消置頂'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      final newPinnedState = !(chat.isPinned ?? false);
+      await _chatService.updateChatPinned(chat.id, newPinnedState);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newPinnedState ? '聊天已置頂' : '聊天已取消置頂'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // 延遲刷新以完成 Dismissible 動畫
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        if (mounted) {
+          setState(() {
+            _refreshKey++;
+            _isOperating = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('操作失敗: $e'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isOperating = false);
+      }
+    }
   }
 
-  void _deleteChat(Chat chat) {
-    _chatService.deleteChat(chat.id);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('聊天已刪除'), duration: Duration(seconds: 2)),
+  // Get avatar for a private chat (fetch other user's avatar)
+  Future<String?> _getPrivateChatAvatar(Chat chat, String currentUserId) async {
+    if (chat.type != 'private') return chat.avatarUrl;
+    
+    // Find the other user's ID
+    final otherUserId = chat.participants.firstWhere(
+      (p) => p != currentUserId,
+      orElse: () => '',
     );
+    
+    if (otherUserId.isEmpty) return null;
+    
+    // Check cache first
+    if (_avatarCache.containsKey(otherUserId)) {
+      return _avatarCache[otherUserId];
+    }
+    
+    // Fetch from database
+    try {
+      final profile = await _db.getUserProfile(otherUserId);
+      final avatar = profile?.photoUrl;
+      _avatarCache[otherUserId] = avatar;
+      if (mounted) setState(() {});
+      return avatar;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _deleteChat(Chat chat) async {
+    try {
+      setState(() => _isOperating = true);
+
+      await _chatService.deleteChat(chat.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('聊天已刪除'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // 延遲刷新以完成 Dismissible 動畫
+        await Future.delayed(const Duration(milliseconds: 300));
+
+        if (mounted) {
+          setState(() {
+            _refreshKey++;
+            _isOperating = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('刪除失敗: $e'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isOperating = false);
+      }
+    }
   }
 }

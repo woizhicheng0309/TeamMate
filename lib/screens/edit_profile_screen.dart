@@ -18,10 +18,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _authService = AuthService();
   final _databaseService = DatabaseService();
   final _supabase = Supabase.instance.client;
-  
+
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _isUploadingImage = false;
   String? _avatarUrl;
@@ -46,14 +46,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _avatarUrl = profile?.photoUrl;
         });
       } catch (e) {
-        print('Error loading profile: $e');
+        // Silent fail
       }
     }
   }
 
   Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
-    
+
     try {
       // 显示选择来源的对话框
       final source = await showDialog<ImageSource>(
@@ -99,21 +99,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final imageFile = File(pickedFile.path);
       final bytes = await imageFile.readAsBytes();
       final fileExt = pickedFile.path.split('.').last;
-      final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final fileName =
+          '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       final filePath = 'avatars/$fileName';
 
       // 上传到 Supabase Storage
-      await _supabase.storage.from('profiles').uploadBinary(
-        filePath,
-        bytes,
-        fileOptions: FileOptions(
-          contentType: 'image/$fileExt',
-          upsert: true,
-        ),
-      );
+      await _supabase.storage
+          .from('profiles')
+          .uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: 'image/$fileExt',
+              upsert: true,
+            ),
+          );
 
       // 获取公开 URL
-      final imageUrl = _supabase.storage.from('profiles').getPublicUrl(filePath);
+      final imageUrl = _supabase.storage
+          .from('profiles')
+          .getPublicUrl(filePath);
 
       // 更新本地状态
       setState(() {
@@ -122,16 +127,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('圖片上傳成功')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('圖片上傳成功')));
       }
     } catch (e) {
       setState(() => _isUploadingImage = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('圖片上傳失敗: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('圖片上傳失敗: $e')));
       }
     }
   }
@@ -153,16 +158,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await _databaseService.updateUserProfile(updatedProfile);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('個人資料已更新')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('個人資料已更新')));
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失敗: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('更新失敗: $e')));
       }
     } finally {
       setState(() => _isLoading = false);
@@ -194,10 +199,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             )
           else
-            TextButton(
-              onPressed: _saveProfile,
-              child: const Text('儲存'),
-            ),
+            TextButton(onPressed: _saveProfile, child: const Text('儲存')),
         ],
       ),
       body: Form(
@@ -216,7 +218,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         )
                       : CircleAvatar(
                           radius: 50,
-                          backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                          backgroundImage:
+                              _avatarUrl != null && _avatarUrl!.isNotEmpty
                               ? NetworkImage(_avatarUrl!)
                               : null,
                           child: _avatarUrl == null || _avatarUrl!.isEmpty
@@ -232,7 +235,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       child: IconButton(
                         icon: const Icon(Icons.camera_alt, size: 18),
                         color: Colors.white,
-                        onPressed: _isUploadingImage ? null : _pickAndUploadImage,
+                        onPressed: _isUploadingImage
+                            ? null
+                            : _pickAndUploadImage,
                       ),
                     ),
                   ),
