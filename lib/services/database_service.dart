@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/activity.dart';
 import '../models/user_profile.dart';
@@ -66,10 +67,10 @@ class DatabaseService {
   Future<List<Activity>> getNearbyActivities({
     required double latitude,
     required double longitude,
-    double radiusKm = 10.0,
+    double radiusKm = 15.0,
   }) async {
     try {
-      // Using PostGIS for geospatial queries with timeout
+      // Get all future activities
       final response = await _supabase
           .from('activities')
           .select()
@@ -88,12 +89,71 @@ class DatabaseService {
           .map((json) => Activity.fromJson(json))
           .toList();
 
-      // Filter by distance (you can implement PostGIS distance query on backend)
-      return activities;
+      // Filter by distance using Haversine formula
+      final nearbyActivities = activities.where((activity) {
+        if (activity.latitude == null || activity.longitude == null) {
+          return false;
+        }
+        
+        final distance = _calculateDistance(
+          latitude,
+          longitude,
+          activity.latitude!,
+          activity.longitude!,
+        );
+        
+        return distance <= radiusKm;
+      }).toList();
+
+      // Sort by distance
+      nearbyActivities.sort((a, b) {
+        final distanceA = _calculateDistance(
+          latitude,
+          longitude,
+          a.latitude!,
+          a.longitude!,
+        );
+        final distanceB = _calculateDistance(
+          latitude,
+          longitude,
+          b.latitude!,
+          b.longitude!,
+        );
+        return distanceA.compareTo(distanceB);
+      });
+
+      return nearbyActivities;
     } catch (e) {
       print('Error getting nearby activities: $e');
       return [];
     }
+  }
+
+  // Haversine formula to calculate distance between two points
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double earthRadiusKm = 6371;
+
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLon = _degreesToRadians(lon2 - lon1);
+
+    final double a = (math.sin(dLat / 2) * math.sin(dLat / 2)) +
+        (math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2));
+
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+
+    return earthRadiusKm * c;
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
   }
 
   Future<Activity> createActivity(Activity activity) async {
