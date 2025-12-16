@@ -5,6 +5,7 @@ import '../services/chat_service.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../models/user_profile.dart';
+import 'group_members_screen.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final Chat chat;
@@ -108,20 +109,32 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         title: Row(
           children: [
             GestureDetector(
-              onTap: widget.chat.type == 'private'
-                  ? () async {
-                      // 獲取對方 ID
-                      final otherUserId = widget.chat.participants.firstWhere(
-                        (id) => id != _authService.userId,
-                        orElse: () => '',
-                      );
-                      if (otherUserId.isNotEmpty) {
-                        final profile = await _db.getUserProfile(otherUserId);
-                        if (!mounted) return;
-                        _showUserInfoSheet(context, profile, otherUserId);
-                      }
-                    }
-                  : null,
+              onTap: () async {
+                if (widget.chat.type == 'private') {
+                  // 私聊：显示对方个人信息
+                  final otherUserId = widget.chat.participants.firstWhere(
+                    (id) => id != _authService.userId,
+                    orElse: () => '',
+                  );
+                  if (otherUserId.isNotEmpty) {
+                    final profile = await _db.getUserProfile(otherUserId);
+                    if (!mounted) return;
+                    _showUserInfoSheet(context, profile, otherUserId);
+                  }
+                } else {
+                  // 群组聊天：显示群组成员列表
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => GroupMembersScreen(
+                        chatId: widget.chat.id,
+                        chatName: chatTitle,
+                        participantIds: widget.chat.participants,
+                      ),
+                    ),
+                  );
+                }
+              },
               child: chatAvatar != null && chatAvatar.isNotEmpty
                   ? Padding(
                       padding: const EdgeInsets.only(right: 12),

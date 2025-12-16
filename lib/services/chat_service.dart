@@ -303,13 +303,15 @@ class ChatService {
         // Silent fail - use original sender name
       }
 
-      // 獲取聊天參與者
+      // 獲取聊天信息（包括類型和參與者）
       final chatData = await _supabase
           .from('chats')
-          .select('participants')
+          .select('type, name, participants')
           .eq('id', chatId)
           .single();
 
+      final chatType = chatData['type'] as String?;
+      final chatName = chatData['name'] as String?;
       final participants = (chatData['participants'] as List<dynamic>)
           .map((e) => e.toString())
           .toList();
@@ -332,15 +334,33 @@ class ChatService {
               continue;
             }
 
+            // 根據聊天類型設置不同的通知格式
+            String notificationTitle;
+            String notificationMessage;
+            
+            if (chatType == 'group') {
+              // 群組聊天：標題顯示群組名稱，消息顯示發送者和內容
+              notificationTitle = chatName ?? '群組聊天';
+              notificationMessage = '$displaySenderName: $message';
+            } else {
+              // 私聊：標題顯示發送者名稱，消息只顯示內容
+              notificationTitle = displaySenderName;
+              notificationMessage = message;
+            }
+
             // 調用 Supabase Edge Function 發送通知
             final response = await _supabase.functions.invoke(
-              'bright-function',
+              'send-push-notification',
               body: {
                 'userId': participantId,
-                'title': '新消息',
-                'message': '$displaySenderName: $message',
+                'title': notificationTitle,
+                'message': notificationMessage,
                 'type': 'chat',
-                'data': {'chat_id': chatId, 'sender_id': senderId},
+                'data': {
+                  'chat_id': chatId,
+                  'sender_id': senderId,
+                  'chat_type': chatType ?? 'private',
+                },
               },
             );
           } catch (error) {

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/activity.dart';
 import '../models/user_profile.dart';
 import '../models/join_request.dart';
+import '../models/friend_request.dart';
 
 class DatabaseService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -26,6 +27,24 @@ class DatabaseService {
     } catch (e) {
       print('Error getting user profile: $e');
       return null;
+    }
+  }
+
+  Future<List<UserProfile>> getUsersByIds(List<String> userIds) async {
+    try {
+      if (userIds.isEmpty) return [];
+      
+      final response = await _supabase
+          .from('users')
+          .select()
+          .inFilter('id', userIds);
+
+      return (response as List)
+          .map((json) => UserProfile.fromJson(json))
+          .toList();
+    } catch (e) {
+      print('Error getting users by ids: $e');
+      return [];
     }
   }
 
@@ -754,9 +773,104 @@ class DatabaseService {
         'status': 'pending',
         'created_at': DateTime.now().toIso8601String(),
       });
+
+      // 發送通知給接收者
+      await _sendNotification(
+        userId: toUserId,
+        type: 'friend_request',
+        title: '新的好友申請',
+        message: '有人想加你為好友',
+        data: {
+          'from_user_id': fromUserId,
+          'type': 'friend_request',
+        },
+      );
     } catch (e) {
       print('Error sending friend request: $e');
       rethrow;
+    }
+  }
+
+  /// 獲取待處理的好友申請（收到的）
+  Future<List<FriendRequest>> getReceivedFriendRequests(String userId) async {
+    try {
+      final response = await _supabase
+          .from('friendships')
+          .select('''
+            *,
+            from_user:users!friendships_user_id_fkey(id, full_name, email, avatar_url)
+          ''')
+          .eq('friend_id', userId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((json) => FriendRequest.fromJson(json))
+          .toList();
+    } catch (e) {
+      print('Error getting friend requests: $e');
+      return [];
+    }
+  }
+
+  /// 獲取發送的好友申請
+  Future<List<FriendRequest>> getSentFriendRequests(String userId) async {
+    try {
+      final response = await _supabase
+          .from('friendships')
+          .select('''
+            *,
+            from_user:users!friendships_user_id_fkey(id, full_name, email, avatar_url)
+          ''')
+          .eq('user_id', userId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((json) => FriendRequest.fromJson(json))
+          .toList();
+    } catch (e) {
+      print('Error getting sent friend requests: $e');
+      return [];
+    }
+  }
+
+  /// 獲取好友列表
+  Future<List<UserProfile>> getFriendsList(String userId) async {
+    try {
+      final response = await _supabase
+          .from('friendships')
+          .select('''
+            friend_id,
+            user_id,
+            friend:users!friendships_friend_id_fkey(id, full_name, email, avatar_url, interests, created_at, updated_at),
+            user:users!friendships_user_id_fkey(id, full_name, email, avatar_url, interests, created_at, updated_at)
+          ''')
+          .or('user_id.eq.$userId,friend_id.eq.$userId')
+          .eq('status', 'accepted');
+
+      final friends = <UserProfile>[];
+      for (final item in response) {
+        // 判斷對方是誰
+        if (item['user_id'] == userId) {
+          // 對方是 friend_id
+          final friendData = item['friend'];
+          if (friendData != null) {
+            friends.add(UserProfile.fromJson(friendData));
+          }
+        } else {
+          // 對方是 user_id
+          final userData = item['user'];
+          if (userData != null) {
+            friends.add(UserProfile.fromJson(userData));
+          }
+        }
+      }
+
+      return friends;
+    } catch (e) {
+      print('Error getting friends list: $e');
+      return [];
     }
   }
 
@@ -788,8 +902,47 @@ class DatabaseService {
           .eq('user_id', friendId)
           .eq('friend_id', userId)
           .eq('status', 'pending');
+
+      // 發送通知給申請者
+      await _sendNotification(
+        userId: friendId,
+        type: 'friend_accepted',
+        title: '好友申請已接受',
+        message: '對方已接受你的好友申請',
+        data: {
+          'friend_id': userId,
+          'type': 'friend_accepted',
+        },
+      );
     } catch (e) {
       print('Error accepting friend request: $e');
+      rethrow;
+    }
+  }
+
+  /// 拒絕好友申請
+  Future<void> rejectFriendRequest(String userId, String friendId) async {
+    try {
+      await _supabase
+          .from('friendships')
+          .update({'status': 'rejected'})
+          .eq('user_id', friendId)
+          .eq('friend_id', userId)
+          .eq('status', 'pending');
+
+      // 發送通知給申請者
+      await _sendNotification(
+        userId: friendId,
+        type: 'friend_rejected',
+        title: '好友申請已拒絕',
+        message: '對方拒絕了你的好友申請',
+        data: {
+          'friend_id': userId,
+          'type': 'friend_rejected',
+        },
+      );
+    } catch (e) {
+      print('Error rejecting friend request: $e');
       rethrow;
     }
   }
@@ -807,6 +960,88 @@ class DatabaseService {
       print('Error removing friend: $e');
       rethrow;
     }
+  }
+
+  // ==================== 通知功能 ====================
+
+  /// 發送推送通知（通過 Supabase Edge Function）
+  Future<void> _sendNotification({
+    required String userId,
+    required String type,
+    required String title,
+    required String message,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _supabase.functions.invoke(
+        'send-push-notification',
+        body: {
+          'userId': userId,
+          'type': type,
+          'title': title,
+          'message': message,
+          'data': data ?? {},
+        },
+      );
+    } catch (e) {
+      print('Error sending notification: $e');
+      // 不拋出錯誤，通知失敗不應該影響主要功能
+    }
+  }
+
+  /// 發送活動申請通知
+  Future<void> sendJoinRequestNotification({
+    required String activityId,
+    required String activityTitle,
+    required String creatorId,
+    required String applicantName,
+  }) async {
+    await _sendNotification(
+      userId: creatorId,
+      type: 'join_request',
+      title: '新的活動申請',
+      message: '$applicantName 想要加入你的活動「$activityTitle」',
+      data: {
+        'activity_id': activityId,
+        'type': 'join_request',
+      },
+    );
+  }
+
+  /// 發送活動申請接受通知
+  Future<void> sendJoinAcceptedNotification({
+    required String userId,
+    required String activityTitle,
+    required String activityId,
+  }) async {
+    await _sendNotification(
+      userId: userId,
+      type: 'join_accepted',
+      title: '活動申請已接受',
+      message: '你的活動申請「$activityTitle」已被接受',
+      data: {
+        'activity_id': activityId,
+        'type': 'join_accepted',
+      },
+    );
+  }
+
+  /// 發送活動申請拒絕通知
+  Future<void> sendJoinRejectedNotification({
+    required String userId,
+    required String activityTitle,
+    required String activityId,
+  }) async {
+    await _sendNotification(
+      userId: userId,
+      type: 'join_rejected',
+      title: '活動申請已拒絕',
+      message: '你的活動申請「$activityTitle」已被拒絕',
+      data: {
+        'activity_id': activityId,
+        'type': 'join_rejected',
+      },
+    );
   }
 
   // Cleanup

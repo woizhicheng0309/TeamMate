@@ -127,6 +127,18 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       // 創建加入申請
       await _databaseService.createJoinRequest(widget.activity.id, userId);
 
+      // 發送通知給活動創建者
+      String applicantName = '某位用戶';
+      final profile = await _databaseService.getUserProfile(userId);
+      applicantName = profile?.displayName ?? profile?.email ?? '某位用戶';
+      
+      await _databaseService.sendJoinRequestNotification(
+        activityId: widget.activity.id,
+        activityTitle: widget.activity.title,
+        creatorId: widget.activity.creatorId,
+        applicantName: applicantName,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -151,6 +163,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   Future<void> _acceptRequest(JoinRequest request) async {
     try {
       await _databaseService.acceptJoinRequest(request.id);
+
+      // 發送通知給申請者
+      await _databaseService.sendJoinAcceptedNotification(
+        userId: request.userId,
+        activityTitle: widget.activity.title,
+        activityId: widget.activity.id,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -170,6 +190,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   Future<void> _rejectRequest(JoinRequest request) async {
     try {
       await _databaseService.rejectJoinRequest(request.id);
+
+      // 發送通知給申請者
+      await _databaseService.sendJoinRejectedNotification(
+        userId: request.userId,
+        activityTitle: widget.activity.title,
+        activityId: widget.activity.id,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,

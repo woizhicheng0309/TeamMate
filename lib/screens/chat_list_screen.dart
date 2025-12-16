@@ -5,6 +5,7 @@ import '../services/database_service.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import 'chat_room_screen.dart';
+import 'friend_requests_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -36,6 +37,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
           title: const Text('聊天'),
           elevation: 0,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.person_add_alt),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FriendRequestsScreen(),
+                  ),
+                ).then((_) => setState(() => _refreshKey++));
+              },
+              tooltip: '好友管理',
+            ),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {
@@ -87,42 +100,69 @@ class _ChatListScreenState extends State<ChatListScreen> {
             final privateChats = sorted
                 .where((c) => c.type != 'group')
                 .toList();
-            final friendChats = <Chat>[];
 
-            List<Widget> buildChildren(List<Chat> items) {
-              // Preload avatars for private chats
-              for (final chat in items) {
-                if (chat.type == 'private') {
-                  _getPrivateChatAvatar(chat, userId);
+            return FutureBuilder<Map<String, bool>>(
+              future: _loadFriendshipStatus(userId, privateChats),
+              builder: (context, friendshipSnapshot) {
+                // 在好友状态加载完成之前，显示加载指示器
+                if (friendshipSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-              }
+                
+                final friendshipMap = friendshipSnapshot.data ?? {};
+                
+                final friendChats = privateChats.where((chat) {
+                  final otherId = chat.participants.firstWhere(
+                    (p) => p != userId,
+                    orElse: () => '',
+                  );
+                  return friendshipMap[otherId] == true;
+                }).toList();
+                
+                final strangerChats = privateChats.where((chat) {
+                  final otherId = chat.participants.firstWhere(
+                    (p) => p != userId,
+                    orElse: () => '',
+                  );
+                  return friendshipMap[otherId] != true;
+                }).toList();
 
-              return items.map((chat) {
-                return Dismissible(
-                  key: Key(chat.id),
-                  direction: DismissDirection.horizontal,
-                  background: _pinBackground(chat),
-                  secondaryBackground: _deleteBackground(),
-                  onDismissed: _isOperating
-                      ? null
-                      : (direction) {
-                          if (direction == DismissDirection.startToEnd) {
-                            _togglePinChat(chat);
-                          } else {
-                            _deleteChat(chat);
-                          }
-                        },
-                  child: _buildChatItem(chat, userId),
+                List<Widget> buildChildren(List<Chat> items) {
+                  // Preload avatars for private chats
+                  for (final chat in items) {
+                    if (chat.type == 'private') {
+                      _getPrivateChatAvatar(chat, userId);
+                    }
+                  }
+
+                  return items.map((chat) {
+                    return Dismissible(
+                      key: Key(chat.id),
+                      direction: DismissDirection.horizontal,
+                      background: _pinBackground(chat),
+                      secondaryBackground: _deleteBackground(),
+                      onDismissed: _isOperating
+                          ? null
+                          : (direction) {
+                              if (direction == DismissDirection.startToEnd) {
+                                _togglePinChat(chat);
+                              } else {
+                                _deleteChat(chat);
+                              }
+                            },
+                      child: _buildChatItem(chat, userId),
+                    );
+                  }).toList();
+                }
+
+                return TabBarView(
+                  children: [
+                    ListView(children: buildChildren(strangerChats)),
+                    ListView(children: buildChildren(friendChats)),
+                    ListView(children: buildChildren(groupChats)),
+                  ],
                 );
-              }).toList();
-            }
-
-            return TabBarView(
-              children: [
-                ListView(children: buildChildren(privateChats)),
-                ListView(children: buildChildren(friendChats)),
-                ListView(children: buildChildren(groupChats)),
-              ],
+              },
             );
           },
         ),
@@ -357,32 +397,83 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       ],
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: () async {
-                      try {
-                        final currentUserId = _authService.currentUser?.id;
-                        if (currentUserId == null) {
-                          throw Exception('用戶未登入');
-                        }
-                        await _db.sendFriendRequest(currentUserId, userId);
-                        if (!context.mounted) return;
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('已送出好友邀請'),
-                            duration: Duration(seconds: 2),
-                          ),
+                  FutureBuilder<String?>(
+                    future: _db.checkFriendshipStatus(
+                      _authService.currentUser?.id ?? '',
+                      userId,
+                    ),
+                    builder: (context, snapshot) {
+                      final friendshipStatus = snapshot.data;
+                      
+                      if (friendshipStatus == 'accepted') {
+                        // 已经是好友，显示删除好友按钮
+                        return TextButton.icon(
+                          onPressed: () async {
+                            try {
+                              final currentUserId = _authService.currentUser?.id;
+                              if (currentUserId == null) {
+                                throw Exception('用戶未登入');
+                              }
+                              await _db.removeFriend(currentUserId, userId);
+                              if (!context.mounted) return;
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('已刪除好友'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              setState(() => _refreshKey++);
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('刪除失敗: $e')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.person_remove, color: Colors.red),
+                          label: const Text('刪除好友', style: TextStyle(color: Colors.red)),
                         );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text('發送失敗: $e')));
+                      } else if (friendshipStatus == 'pending') {
+                        // 已发送申请，显示等待状态
+                        return TextButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.hourglass_empty),
+                          label: const Text('等待回應'),
+                        );
+                      } else {
+                        // 还不是好友，显示加好友按钮
+                        return TextButton.icon(
+                          onPressed: () async {
+                            try {
+                              final currentUserId = _authService.currentUser?.id;
+                              if (currentUserId == null) {
+                                throw Exception('用戶未登入');
+                              }
+                              await _db.sendFriendRequest(currentUserId, userId);
+                              if (!context.mounted) return;
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('已送出好友邀請'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              setState(() => _refreshKey++);
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('發送失敗: $e')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.person_add_alt_1),
+                          label: const Text('加好友'),
+                        );
                       }
                     },
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('加好友'),
                   ),
                 ],
               ),
@@ -526,5 +617,29 @@ class _ChatListScreenState extends State<ChatListScreen> {
         setState(() => _isOperating = false);
       }
     }
+  }
+
+  /// 加载好友关系状态
+  Future<Map<String, bool>> _loadFriendshipStatus(
+    String currentUserId,
+    List<Chat> chats,
+  ) async {
+    final Map<String, bool> friendshipMap = {};
+    
+    for (final chat in chats) {
+      if (chat.type == 'private') {
+        final otherId = chat.participants.firstWhere(
+          (p) => p != currentUserId,
+          orElse: () => '',
+        );
+        
+        if (otherId.isNotEmpty) {
+          final status = await _db.checkFriendshipStatus(currentUserId, otherId);
+          friendshipMap[otherId] = status == 'accepted';
+        }
+      }
+    }
+    
+    return friendshipMap;
   }
 }
