@@ -23,10 +23,8 @@ class AuthService {
         redirectTo: 'io.supabase.teammate://login-callback/',
       );
 
-      // 登入成功後設置 OneSignal 用戶 ID
-      if (response && userId != null) {
-        await _notificationService.setUserId(userId!);
-      }
+      // 注意：此方法僅啟動 OAuth 流程，真正完成登入要等 onAuthStateChange 事件。
+      // 不要在這裡設定 OneSignal 用戶 ID，避免使用到舊的 userId。
 
       return response;
     } catch (e) {
@@ -43,10 +41,7 @@ class AuthService {
         OAuthProvider.google,
       );
 
-      // 登入成功後設置 OneSignal 用戶 ID
-      if (response && userId != null) {
-        await _notificationService.setUserId(userId!);
-      }
+      // 同上：真正登入完成會由 onAuthStateChange 通知，不在此處設定通知用戶。
 
       return response;
     } catch (e) {
@@ -60,7 +55,8 @@ class AuthService {
       // 登出時清除 OneSignal 用戶 ID
       await _notificationService.logout();
 
-      await _supabase.auth.signOut();
+      // 使用 Global scope 確保完整登出（撤銷 refresh token），避免再次登入時沿用舊會話/帳號。
+      await _supabase.auth.signOut(scope: SignOutScope.global);
     } catch (e) {
       rethrow;
     }
