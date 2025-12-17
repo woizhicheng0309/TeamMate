@@ -51,5 +51,22 @@
 	<string>TeamMate 需要訪問您的位置來找到附近的活動</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>TeamMate 需要訪問您的位置來找到附近的活動</string>
+	<!-- Supabase OAuth callback: custom URL scheme -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.supabase.teammate</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.supabase.teammate</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Allow opening back from browser into app for OAuth deep links -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>io.supabase.teammate</string>
+	</array>
 </dict>
 </plist>
